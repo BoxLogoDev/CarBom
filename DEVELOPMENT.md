@@ -1,7 +1,7 @@
 # 카봄 개발 기록
 
 개발 방식: 창고노트(StockNotes)와 같은 상시 개선 사이클 — Muse Code `/poteto-mode`(모델 Muse Wonder Full, `muse-wonder-full-1.0`)에 단위 위임, 페퍼가 감독 검증.
-기간: 2026-11-06 ~ 2026-11-14 (공모전 제출 전날까지). 제출 마감 2026-11-15 23:59.
+기간: 2026-10-24 ~ 2026-11-14 (공모전 제출 전날까지). 2026-10-24 주인님 지시로 Meta 해커톤 사이클과 병행 가동한다. 해커톤 집중 구간(10-27~11-05)에는 1단계 코어 엔진 범위를 우선한다. 제출 마감 2026-11-15 23:59.
 
 ## 최종 산출 목표 (2026-11-14까지)
 
@@ -18,7 +18,7 @@
 
 ## 반영 완료
 
-(없음)
+- 2026-10-24 · 엔진 기능 · 코어 엔진 첫 단위 — 신호 모델(`engine/signals.py`: SignalSnapshot·SignalEvent, 뒷문·후석 벨트·시동·공조/실내온도·잠금)과 케어 세션 상태머신(`engine/session.py`: IDLE→BOARDING→ONBOARD→DRIVING→ARRIVED→ALIGHTING→COMPLETED, 시동 OFF+잠금+동승자 잔류 시 EXCEPTION 전이, 전이 이력 기록), `engine/__init__.py` re-export, `tests/test_session.py` 테스트 10개(등원 정상 흐름·하차 깜빡 예외 흐름 포함). 감독 검증: 변경 파일 직접 확인, `python3 -m unittest discover -s tests` 10개 전부 통과, 공개 정보(실명·연락처·소속·LS 표현) 0건 확인. Muse Code 세션은 파일 완성 후 산출 없이 멈춰 감독자가 종료하고 검증을 직접 수행함. [페퍼 · 2026-10-24 · 카봄 사이클 1회차]
 
 ## 제안
 
