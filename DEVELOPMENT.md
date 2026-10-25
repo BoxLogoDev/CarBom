@@ -42,6 +42,8 @@
 
 - 2026-10-26 · 제출 자료·문서 · README 재 stale 갱신 (11회차 제안 반영) — `README.md`: 현재 구현 표에 `engine/adapters/simulator.py` 시뮬레이션 신호 어댑터 행 추가(고정 시나리오 3종 스냅샷 시퀀스 제공, `scenario_snapshots` 이름 조회·`replay` 세션 재생, 엔진의 신호 출처 독립 원칙과 연결해 기술), 단위 테스트 수 48개→61개로 정정, 구조 트리에 `engine/adapters/`(`__init__.py`·`simulator.py`)·`tests/test_simulator.py`·`tests/test_session_edge_qa.py` 추가. '예정' 목록(demo·Vehicle SDK 어댑터·AAOS)은 그대로 유지. 감독 검증: 변경 파일은 README.md 1개만(engine·tests 무변경, mtime 확인), `python3 -m unittest discover -s tests` 61개 전부 통과, 공개 정보(실명·연락처·소속·LS 표현) 0건 확인. 실행 경과: Muse Code 세션은 약 12분간 산출 파일 없이 멈춰 감독자가 종료하고 단위를 직접 이어받아 작성·검증을 완료함(회차 시작 2026-10-26 06:50). 참고: GitHub 저장소 README는 백업 스크립트의 고정 문안이 적용되므로 이번 갱신은 로컬 README에만 반영됨(동기화 불일치 제안은 주인님 확인 대기로 유지). [페퍼 · 2026-10-26 · 카봄 사이클 12회차]
 
+- 2026-10-26 · QA · 안내 문구 경계 조건 — `tests/test_guidance_boundary_qa.py` 테스트 13개: ① ARRIVED 온도 경계(31.9℃는 온도 문구·hot/dangerous 사유 없음, 32.0℃ 정확히 hot 진입·'즉시' 없음, 34.9℃ hot 유지, 35.0℃ 정확히 dangerous·'즉시' 포함) ② EXCEPTION 온도 경계(32.0℃ hot·'위험합니다' 없음, 34.9℃ hot 유지, 35.0℃ dangerous·'위험'·'즉시' 포함) ③ PICKUP 맥락(BOARDING '하원' INFO, ARRIVED '하원'·'뒷좌석' REMIND) ④ 문자열 맥락 정규화('dropoff'·' DROPOFF '는 Enum과 동일 결과, 'unknown'·None은 GENERAL로 폴백). 결함은 발견되지 않음. 감독 검증: 변경 파일은 신규 파일 1개만(엔진·기존 테스트 무변경, mtime 확인), `python3 -m unittest discover -s tests` 74개 전부 통과(기존 61 + 신규 13), 공개 정보(실명·연락처·소속·LS 표현) 0건 확인. 실행 경과: Muse Code 세션은 약 19분간 산출 파일 없이 멈춰 감독자가 세션을 종료하고 단위를 직접 이어받아 작성·검증을 완료함(회차 시작 2026-10-26 07:50). [페퍼 · 2026-10-26 · 카봄 사이클 13회차]
+
 ## 제안
 
 - 반려동물 판정의 벨트 의존: 현행 엔진은 후석 벨트 체결로만 동승자를 판정하므로, 벨트로 고정하지 않은 반려동물(무릎 위·고정 안 된 이동장)은 감지할 수 없다. 동승 프로필(`engine/profiles.py`) 단계에서 수동 탑승 확인 같은 보조 판정 수단을 검토할 것. 설계 변경이므로 이번 회차에서는 실행하지 않음. [페퍼 · 2026-10-25 · 카봄 사이클 4회차 QA에서 도출]
