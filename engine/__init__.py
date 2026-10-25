@@ -1,5 +1,12 @@
 """플랫폼 독립 코어 엔진 패키지."""
 
+from engine.guidance import (
+    DestinationContext,
+    Guidance,
+    GuidanceLevel,
+    guidance_for,
+    guidance_for_session,
+)
 from engine.session import CareSession, SessionState, StateTransition
 from engine.signals import (
     DoorState,
@@ -12,7 +19,10 @@ from engine.signals import (
 
 __all__ = [
     "CareSession",
+    "DestinationContext",
     "DoorState",
+    "Guidance",
+    "GuidanceLevel",
     "IgnitionState",
     "LockState",
     "SessionState",
@@ -20,4 +30,6 @@ __all__ = [
     "SignalEventType",
     "SignalSnapshot",
     "StateTransition",
+    "guidance_for",
+    "guidance_for_session",
 ]
