@@ -36,6 +36,8 @@
 
 - 2026-10-26 · 엔진 기능 · 시뮬레이션 신호 어댑터 — `engine/adapters/simulator.py`(`SCENARIO_NAMES`, `dropoff_normal_snapshots`: 등원 정상 흐름 6단계·60초 간격 타임스탬프, `forgotten_rising_temp_snapshots`: 잠금 EXCEPTION 진입 후 공조 OFF·실내 온도 28.0→32.0→35.5℃ 상승, `scenario_snapshots`: 이름으로 시나리오 조회·알 수 없는 이름은 ValueError, `replay`: 스냅샷 시퀀스를 세션에 순서대로 적용), `engine/adapters/__init__.py` re-export, `tests/test_simulator.py` 테스트 7개(정상 흐름 COMPLETED·예외 흐름 EXCEPTION/최종 온도 35.5℃·시나리오 이름 조회 일치·미등록 이름 ValueError·타임스탬프 단조 증가·결정성·시작 시각 이동). PLAN 구조의 `adapters/simulator.py` 예정 항목을 채웠고, 세션 상태머신 본체와 기존 모듈은 변경하지 않음. 감독 검증: 변경 파일 3개 직접 확인, 기존 엔진·테스트 무변경(mtime 확인), `python3 -m unittest discover -s tests` 55개 전부 통과(기존 48 + 신규 7), 공개 정보(실명·연락처·소속·LS 표현) 0건 확인. 실행 경과: Muse Code 세션은 파일 3개를 완성한 뒤 종료 신호 없이 멈춰 감독자가 세션을 종료하고 검증을 직접 수행함(회차 시작 2026-10-26 02:50). [페퍼 · 2026-10-26 · 카봄 사이클 9회차]
 
+- 2026-10-26 · QA · 상태머신 경계·회복 경로 — `tests/test_session_edge_qa.py` 테스트 4개: ① 동승자 없이 뒷문을 열었다 닫으면 BOARDING→IDLE 복귀(`boarding_without_passenger` 사유 기록) ② EXCEPTION에서 잠금 해제+시동 ON(동승자 잔류·뒷문 닫힘) 시 ONBOARD를 거쳐 DRIVING까지 단계 전이(`unlocked_and_ignition_on_after_exception` 사유 기록) ③ COMPLETED 종단성 — 이후 잠금·뒷문 열림·시동 ON 스냅샷에도 상태·history 길이 불변 ④ `reset()` 후 IDLE·history 비어 있음·동승자 없음으로 초기화되고 새 BOARDING 흐름 재시작 가능. 결함은 발견되지 않음. 감독 검증: 변경 파일은 신규 파일 1개만(엔진·기존 테스트 무변경, mtime 확인), `python3 -m unittest discover -s tests` 59개 전부 통과(기존 55 + 신규 4), 공개 정보(실명·연락처·소속·LS 표현) 0건 확인. [페퍼 · 2026-10-26 · 카봄 사이클 10회차]
+
 ## 제안
 
 - 반려동물 판정의 벨트 의존: 현행 엔진은 후석 벨트 체결로만 동승자를 판정하므로, 벨트로 고정하지 않은 반려동물(무릎 위·고정 안 된 이동장)은 감지할 수 없다. 동승 프로필(`engine/profiles.py`) 단계에서 수동 탑승 확인 같은 보조 판정 수단을 검토할 것. 설계 변경이므로 이번 회차에서는 실행하지 않음. [페퍼 · 2026-10-25 · 카봄 사이클 4회차 QA에서 도출]
