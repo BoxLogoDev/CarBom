@@ -7,6 +7,7 @@ from engine.adapters import (
     SCENARIO_NAMES,
     dropoff_normal_snapshots,
     forgotten_rising_temp_snapshots,
+    pet_dropoff_snapshots,
     replay,
     scenario_snapshots,
 )
@@ -38,6 +39,17 @@ class SimulatorTest(unittest.TestCase):
             [28.0, 32.0, 35.5],
         )
 
+    def test_pet_dropoff_replays_to_completed(self):
+        session = CareSession()
+        snapshots = pet_dropoff_snapshots()
+
+        state = replay(session, snapshots)
+
+        self.assertEqual(state, SessionState.COMPLETED)
+        self.assertEqual(session.state, SessionState.COMPLETED)
+        self.assertFalse(session.passenger_present)
+        self.assertTrue(snapshots[2].hvac_on)
+
     def test_scenario_snapshots_matches_direct_functions(self):
         self.assertEqual(
             scenario_snapshots("dropoff_normal"),
@@ -48,7 +60,12 @@ class SimulatorTest(unittest.TestCase):
             forgotten_rising_temp_snapshots(),
         )
         self.assertEqual(
-            SCENARIO_NAMES, ("dropoff_normal", "forgotten_rising_temp")
+            scenario_snapshots("pet_dropoff"),
+            pet_dropoff_snapshots(),
+        )
+        self.assertEqual(
+            SCENARIO_NAMES,
+            ("dropoff_normal", "forgotten_rising_temp", "pet_dropoff"),
         )
 
     def test_scenario_snapshots_unknown_name_raises(self):
@@ -82,6 +99,17 @@ class SimulatorTest(unittest.TestCase):
 
         self.assertEqual(snapshots[0].timestamp, 1000.0)
         self.assertEqual(snapshots[-1].timestamp, 1300.0)
+
+    def test_pet_dropoff_timestamps_increase_by_sixty_from_start(self):
+        snapshots = pet_dropoff_snapshots(start=1000.0)
+
+        timestamps = [snap.timestamp for snap in snapshots]
+        self.assertEqual(
+            timestamps,
+            [1000.0 + 60.0 * index for index in range(len(timestamps))],
+        )
+        self.assertEqual(timestamps[0], 1000.0)
+        self.assertEqual(timestamps[-1], 1300.0)
 
 
 if __name__ == "__main__":
