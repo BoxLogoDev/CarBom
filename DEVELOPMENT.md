@@ -24,6 +24,8 @@
 
 - 2026-10-25 · 엔진 기능 · 안내 문구 엔진 — `engine/guidance.py`(GuidanceLevel IntEnum NONE<INFO<REMIND<URGENT, Guidance, DestinationContext GENERAL/DROPOFF/PICKUP, `guidance_for`·`guidance_for_session`): 상태별 단계 문구(등원 DROPOFF 맥락 포함), EXCEPTION은 URGENT, 실내 온도 32℃ 이상 문구에 온도 포함·35℃ 이상 표현/reason escalation, 동승자 없음·IDLE은 NONE+빈 문구(COMPLETED는 INFO 완료 문구, BOARDING은 승차 진행으로 INFO). `engine/__init__.py` re-export 추가, `tests/test_guidance.py` 테스트 11개. 감독 검증: 변경 파일 3개 직접 확인, 기존 엔진·테스트 무변경, `python3 -m unittest discover -s tests` 24개 전부 통과(기존 13 + 신규 11), 공개 정보(실명·연락처·소속·LS 표현) 0건 확인. 실행 경과: 1차 세션은 테스트 파일을 만든 뒤 런타임 재시작으로 중단돼, 테스트를 살린 좁은 단위로 1회 재위임해 구현을 완성했고, 파일 완성 후 종료 신호가 없어 감독자가 세션을 종료하고 검증을 직접 수행함. [페퍼 · 2026-10-25 · 카봄 사이클 3회차]
 
+- 2026-10-25 · QA · 고정 시나리오 반려동물 변형 — `tests/test_pet_variant_qa.py` 테스트 3개: 반려동물 이동장이 후석 안전벨트로 고정된 경우를 현행 동승자 판정(벨트 체결 시 동승자 있음)으로 모델링한다는 전제를 명시하고, ① 정상 흐름(승차→주행→ARRIVED에서 안내 REMIND·뒷좌석 확인 문구→하차→COMPLETED) ② 하차 깜빡 + 잠금 + 실내 34.0℃에서 EXCEPTION·안내 URGENT(온도 문구 포함) ③ 예외 뒤 뒷문 열림→ALIGHTING→COMPLETED 회복(history 기록 확인). 결함은 발견되지 않음. 감독 검증: 변경 파일(신규 파일 1개) 직접 확인, 엔진·기존 테스트 무변경, `python3 -m unittest discover -s tests` 27개 전부 통과(기존 24 + 신규 3), 공개 정보(실명·연락처·소속·LS 표현) 0건 확인. 실행 경과: 1차 세션은 런타임 재시작으로 산출 없이 중단돼 좁은 단위로 1회 재위임했고, 재위임 세션은 파일 완성 후 종료 신호가 없어 감독자가 세션을 종료하고 검증을 직접 수행함. [페퍼 · 2026-10-25 · 카봄 사이클 4회차]
+
 ## 제안
 
-(없음)
+- 반려동물 판정의 벨트 의존: 현행 엔진은 후석 벨트 체결로만 동승자를 판정하므로, 벨트로 고정하지 않은 반려동물(무릎 위·고정 안 된 이동장)은 감지할 수 없다. 동승 프로필(`engine/profiles.py`) 단계에서 수동 탑승 확인 같은 보조 판정 수단을 검토할 것. 설계 변경이므로 이번 회차에서는 실행하지 않음. [페퍼 · 2026-10-25 · 카봄 사이클 4회차 QA에서 도출]
