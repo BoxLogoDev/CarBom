@@ -20,6 +20,8 @@
 
 - 2026-10-24 · 엔진 기능 · 코어 엔진 첫 단위 — 신호 모델(`engine/signals.py`: SignalSnapshot·SignalEvent, 뒷문·후석 벨트·시동·공조/실내온도·잠금)과 케어 세션 상태머신(`engine/session.py`: IDLE→BOARDING→ONBOARD→DRIVING→ARRIVED→ALIGHTING→COMPLETED, 시동 OFF+잠금+동승자 잔류 시 EXCEPTION 전이, 전이 이력 기록), `engine/__init__.py` re-export, `tests/test_session.py` 테스트 10개(등원 정상 흐름·하차 깜빡 예외 흐름 포함). 감독 검증: 변경 파일 직접 확인, `python3 -m unittest discover -s tests` 10개 전부 통과, 공개 정보(실명·연락처·소속·LS 표현) 0건 확인. Muse Code 세션은 파일 완성 후 산출 없이 멈춰 감독자가 종료하고 검증을 직접 수행함. [페퍼 · 2026-10-24 · 카봄 사이클 1회차]
 
+- 2026-10-25 · QA · 고정 시나리오 각도 추가 — 하차 깜빡 + 실내 온도 상승 예외 흐름 테스트(`tests/test_session_qa.py`, 테스트 3개: 잠금 시 EXCEPTION 진입, 온도 단계 상승(28.0→32.0→35.5℃, 공조 OFF) 중 EXCEPTION 유지·동승자 잔류·최신 온도 반영·COMPLETED 전이 없음, 온도 상승 뒤 뒷문 열림→ALIGHTING→COMPLETED 회복). 결함은 발견되지 않음. 감독 검증: 변경 파일(신규 파일 1개) 직접 확인, 엔진·기존 테스트 무변경, `python3 -m unittest discover -s tests` 13개 전부 통과(기존 10 + 신규 3), 공개 정보(실명·연락처·소속·LS 표현) 0건 확인. Muse Code 세션은 파일 완성 후 종료 신호를 보내지 않아 25분 제한으로 감독자가 종료하고 검증을 직접 수행함. [페퍼 · 2026-10-25 · 카봄 사이클 2회차]
+
 ## 제안
 
 (없음)
