@@ -26,6 +26,9 @@
 
 - 2026-10-25 · QA · 고정 시나리오 반려동물 변형 — `tests/test_pet_variant_qa.py` 테스트 3개: 반려동물 이동장이 후석 안전벨트로 고정된 경우를 현행 동승자 판정(벨트 체결 시 동승자 있음)으로 모델링한다는 전제를 명시하고, ① 정상 흐름(승차→주행→ARRIVED에서 안내 REMIND·뒷좌석 확인 문구→하차→COMPLETED) ② 하차 깜빡 + 잠금 + 실내 34.0℃에서 EXCEPTION·안내 URGENT(온도 문구 포함) ③ 예외 뒤 뒷문 열림→ALIGHTING→COMPLETED 회복(history 기록 확인). 결함은 발견되지 않음. 감독 검증: 변경 파일(신규 파일 1개) 직접 확인, 엔진·기존 테스트 무변경, `python3 -m unittest discover -s tests` 27개 전부 통과(기존 24 + 신규 3), 공개 정보(실명·연락처·소속·LS 표현) 0건 확인. 실행 경과: 1차 세션은 런타임 재시작으로 산출 없이 중단돼 좁은 단위로 1회 재위임했고, 재위임 세션은 파일 완성 후 종료 신호가 없어 감독자가 세션을 종료하고 검증을 직접 수행함. [페퍼 · 2026-10-25 · 카봄 사이클 4회차]
 
+- 2026-10-25 · 엔진 기능 · 동승 프로필 — `engine/profiles.py`(PassengerKind CHILD/PET/ELDER/ADULT, PassengerProfile frozen dataclass: label·belt_detectable·requires_manual_confirmation_when_unbelted·reminder_note, `profile_for`(Enum·문자열 파싱, 알 수 없는 값은 ADULT), `all_profiles`, `needs_manual_confirmation`: 벨트 체결 시 항상 False, 미체결 시 프로필 설정 — PET만 True로 두어 4회차 제안의 수동 탑승 확인 보조 판정을 프로필 수준에서 반영), `engine/__init__.py` re-export 추가, `tests/test_profiles.py` 테스트 9개. 세션 상태머신 본체(session.py) 판정 로직은 변경하지 않음. 감독 검증: 변경 파일 3개 직접 확인, `python3 -m unittest discover -s tests` 36개 전부 통과(기존 27 + 신규 9), 공개 정보(실명·연락처·소속·LS 표현) 0건 확인. 실행 경과: 1차 Muse Code 세션은 25분 제한(timeout 1500, EXIT:124)까지 산출 파일 없이 종료돼, 감독자가 단위를 직접 이어받아 구현·검증을 완료함. [페퍼 · 2026-10-25 · 카봄 사이클 5회차]
+
 ## 제안
 
 - 반려동물 판정의 벨트 의존: 현행 엔진은 후석 벨트 체결로만 동승자를 판정하므로, 벨트로 고정하지 않은 반려동물(무릎 위·고정 안 된 이동장)은 감지할 수 없다. 동승 프로필(`engine/profiles.py`) 단계에서 수동 탑승 확인 같은 보조 판정 수단을 검토할 것. 설계 변경이므로 이번 회차에서는 실행하지 않음. [페퍼 · 2026-10-25 · 카봄 사이클 4회차 QA에서 도출]
+- (5회차 부분 반영) 위 제안의 프로필 수준 반영은 완료됐다(`needs_manual_confirmation`). 남은 것은 `CareSession`이 프로필과 수동 확인 입력을 실제로 받아 동승자 판정에 쓰는 세션 통합인데, 이는 상태머신 설계 변경이라 별도 단위에서 주인님 확인 후 진행할 것. [페퍼 · 2026-10-25 · 카봄 사이클 5회차]

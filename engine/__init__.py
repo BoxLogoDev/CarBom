@@ -7,6 +7,13 @@ from engine.guidance import (
     guidance_for,
     guidance_for_session,
 )
+from engine.profiles import (
+    PassengerKind,
+    PassengerProfile,
+    all_profiles,
+    needs_manual_confirmation,
+    profile_for,
+)
 from engine.session import CareSession, SessionState, StateTransition
 from engine.signals import (
     DoorState,
@@ -25,11 +32,16 @@ __all__ = [
     "GuidanceLevel",
     "IgnitionState",
     "LockState",
+    "PassengerKind",
+    "PassengerProfile",
     "SessionState",
     "SignalEvent",
     "SignalEventType",
     "SignalSnapshot",
     "StateTransition",
+    "all_profiles",
     "guidance_for",
     "guidance_for_session",
+    "needs_manual_confirmation",
+    "profile_for",
 ]
