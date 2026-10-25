@@ -28,6 +28,8 @@
 
 - 2026-10-25 · 엔진 기능 · 동승 프로필 — `engine/profiles.py`(PassengerKind CHILD/PET/ELDER/ADULT, PassengerProfile frozen dataclass: label·belt_detectable·requires_manual_confirmation_when_unbelted·reminder_note, `profile_for`(Enum·문자열 파싱, 알 수 없는 값은 ADULT), `all_profiles`, `needs_manual_confirmation`: 벨트 체결 시 항상 False, 미체결 시 프로필 설정 — PET만 True로 두어 4회차 제안의 수동 탑승 확인 보조 판정을 프로필 수준에서 반영), `engine/__init__.py` re-export 추가, `tests/test_profiles.py` 테스트 9개. 세션 상태머신 본체(session.py) 판정 로직은 변경하지 않음. 감독 검증: 변경 파일 3개 직접 확인, `python3 -m unittest discover -s tests` 36개 전부 통과(기존 27 + 신규 9), 공개 정보(실명·연락처·소속·LS 표현) 0건 확인. 실행 경과: 1차 Muse Code 세션은 25분 제한(timeout 1500, EXIT:124)까지 산출 파일 없이 종료돼, 감독자가 단위를 직접 이어받아 구현·검증을 완료함. [페퍼 · 2026-10-25 · 카봄 사이클 5회차]
 
+- 2026-10-26 · 제출 자료·문서 · README 신규 작성 — `README.md`(60줄): 프로젝트 소개(하차 확인 가족 동승 케어, 공모전 출품작), 설계 원칙(엔진의 신호 출처 독립·결정적 판정), 현재 구현 표(신호 모델·세션 상태머신·안내 문구 엔진·동승 프로필 — 실제 코드가 있는 모듈만), 고정 시나리오 3종 포함 단위 테스트 36개와 실행 방법, 실제 파일만 적은 구조 트리, 미구현 항목(케어 리포트·웹 데모·Vehicle SDK 실신호 어댑터·AAOS 패키징)은 '예정'으로 명시해 완료로 주장하지 않음. 감독 검증: 변경 파일은 README.md 신규 1개만(engine·tests 무변경, mtime 확인), `python3 -m unittest discover -s tests` 36개 전부 통과, 공개 정보(실명·연락처·소속·LS 표현) 0건 확인. 실행 경과: Muse Code 세션은 15분 넘게 산출 파일 없이 멈춰 감독자가 종료하고 단위를 직접 이어받아 작성·검증을 완료함(회차 시작 2026-10-25 23:50). [페퍼 · 2026-10-26 · 카봄 사이클 6회차]
+
 ## 제안
 
 - 반려동물 판정의 벨트 의존: 현행 엔진은 후석 벨트 체결로만 동승자를 판정하므로, 벨트로 고정하지 않은 반려동물(무릎 위·고정 안 된 이동장)은 감지할 수 없다. 동승 프로필(`engine/profiles.py`) 단계에서 수동 탑승 확인 같은 보조 판정 수단을 검토할 것. 설계 변경이므로 이번 회차에서는 실행하지 않음. [페퍼 · 2026-10-25 · 카봄 사이클 4회차 QA에서 도출]
