@@ -325,4 +325,26 @@ document.getElementById("next-step").addEventListener("click", nextStep);
 document.getElementById("reset").addEventListener("click", resetDemo);
 document.getElementById("scenario-select").addEventListener("change", changeScenario);
 
+function applyQueryParams() {
+  if (typeof window === "undefined" || !window.location) {
+    return;
+  }
+  var params = new URLSearchParams(window.location.search || "");
+  var scenario = params.get("scenario");
+  if (scenario && Object.prototype.hasOwnProperty.call(SCENARIOS, scenario)) {
+    currentScenario = scenario;
+  }
+  var stepParam = params.get("step");
+  if (stepParam !== null) {
+    var stepNumber = parseInt(stepParam, 10);
+    if (!isNaN(stepNumber)) {
+      var maxIndex = SCENARIOS[currentScenario].steps.length - 1;
+      currentStep = Math.min(Math.max(stepNumber - 1, 0), maxIndex);
+    }
+  }
+  document.getElementById("scenario-select").value = currentScenario;
+}
+
+applyQueryParams();
+
 render();
