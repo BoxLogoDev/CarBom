@@ -7,7 +7,7 @@
 
 import unittest
 
-from engine.adapters import VehicleSdkAdapter, snapshot_from_raw
+from engine.adapters import VehicleSdkAdapter, raw_from_snapshot, snapshot_from_raw
 from engine.signals import DoorState, IgnitionState, LockState, SignalSnapshot
 
 
@@ -67,6 +67,60 @@ class SnapshotFromRawTest(unittest.TestCase):
 
     def test_conversion_is_deterministic(self):
         self.assertEqual(snapshot_from_raw(FULL_RAW), snapshot_from_raw(FULL_RAW))
+
+
+class RawFromSnapshotTest(unittest.TestCase):
+    def test_default_snapshot_gives_all_false_and_none(self):
+        self.assertEqual(
+            raw_from_snapshot(SignalSnapshot()),
+            {
+                "rear_door_open": False,
+                "rear_seat_belt_buckled": False,
+                "ignition_on": False,
+                "locked": False,
+                "hvac_on": False,
+                "cabin_temp_c": None,
+                "timestamp": None,
+            },
+        )
+
+    def test_full_raw_round_trips_through_snapshot(self):
+        self.assertEqual(
+            raw_from_snapshot(snapshot_from_raw(FULL_RAW)), FULL_RAW
+        )
+
+    def test_arbitrary_snapshot_round_trips_through_raw(self):
+        snap = SignalSnapshot(
+            rear_door=DoorState.OPEN,
+            rear_seat_belt_buckled=True,
+            ignition=IgnitionState.OFF,
+            hvac_on=False,
+            cabin_temp_c=None,
+            lock=LockState.LOCKED,
+            timestamp=50.0,
+        )
+        self.assertEqual(snapshot_from_raw(raw_from_snapshot(snap)), snap)
+
+    def test_none_temp_and_timestamp_stay_none(self):
+        raw = raw_from_snapshot(
+            SignalSnapshot(cabin_temp_c=None, timestamp=None)
+        )
+        self.assertIsNone(raw["cabin_temp_c"])
+        self.assertIsNone(raw["timestamp"])
+
+    def test_keys_are_exactly_the_seven_raw_keys(self):
+        self.assertEqual(
+            set(raw_from_snapshot(snapshot_from_raw(FULL_RAW))),
+            {
+                "rear_door_open",
+                "rear_seat_belt_buckled",
+                "ignition_on",
+                "locked",
+                "hvac_on",
+                "cabin_temp_c",
+                "timestamp",
+            },
+        )
 
 
 class VehicleSdkAdapterTest(unittest.TestCase):

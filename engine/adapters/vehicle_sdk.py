@@ -20,6 +20,7 @@ from engine.signals import DoorState, IgnitionState, LockState, SignalSnapshot
 
 __all__ = [
     "VehicleSdkAdapter",
+    "raw_from_snapshot",
     "snapshot_from_raw",
 ]
 
@@ -52,6 +53,23 @@ def snapshot_from_raw(raw: Mapping[str, Any]) -> SignalSnapshot:
         lock=LockState.LOCKED if raw.get("locked") else LockState.UNLOCKED,
         timestamp=raw.get("timestamp"),
     )
+
+
+def raw_from_snapshot(snapshot: SignalSnapshot) -> dict:
+    """SignalSnapshot을 원시 신호 dict로 바꾼다.
+
+    snapshot_from_raw의 정확한 역변환이다.
+    7개 키를 항상 모두 포함한다.
+    """
+    return {
+        "rear_door_open": bool(snapshot.rear_door_open),
+        "rear_seat_belt_buckled": bool(snapshot.rear_seat_belt_buckled),
+        "ignition_on": bool(snapshot.ignition_on),
+        "locked": bool(snapshot.locked),
+        "hvac_on": bool(snapshot.hvac_on),
+        "cabin_temp_c": snapshot.cabin_temp_c,
+        "timestamp": snapshot.timestamp,
+    }
 
 
 class VehicleSdkAdapter:
