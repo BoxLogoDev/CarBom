@@ -265,5 +265,103 @@ class CareReportLogTest(unittest.TestCase):
         self.assertEqual(log.reports, (report,))
 
 
+def make_report(**overrides):
+    values = {
+        "final_state": SessionState.COMPLETED,
+        "completed": True,
+        "exception_occurred": False,
+        "exception_count": 0,
+        "transition_count": 0,
+        "passenger_present": False,
+        "started_at": None,
+        "ended_at": None,
+        "duration_seconds": None,
+        "max_cabin_temp_c": None,
+        "transitions": (),
+    }
+    values.update(overrides)
+    if "exception_occurred" not in overrides:
+        values["exception_occurred"] = values["exception_count"] > 0
+    return CareReport(**values)
+
+
+class CareReportLogStatsTest(unittest.TestCase):
+    def test_empty_log_stats_are_zero_and_none(self):
+        log = CareReportLog()
+
+        self.assertEqual(log.total_exception_count, 0)
+        self.assertIsNone(log.max_cabin_temp_c)
+        self.assertIsNone(log.average_duration_seconds)
+
+    def test_total_exception_count_sums_all_reports(self):
+        log = CareReportLog()
+        log.add_report(make_report(exception_count=2))
+        log.add_report(make_report(exception_count=3))
+        log.add_report(make_report(exception_count=0))
+
+        self.assertEqual(log.total_exception_count, 5)
+
+    def test_max_cabin_temp_is_max_across_reports(self):
+        log = CareReportLog()
+        log.add_report(make_report(max_cabin_temp_c=24.0))
+        log.add_report(make_report(max_cabin_temp_c=31.5))
+        log.add_report(make_report(max_cabin_temp_c=28.0))
+
+        self.assertEqual(log.max_cabin_temp_c, 31.5)
+
+    def test_max_cabin_temp_ignores_none_temps(self):
+        log = CareReportLog()
+        log.add_report(make_report(max_cabin_temp_c=None))
+        log.add_report(make_report(max_cabin_temp_c=29.0))
+        log.add_report(make_report(max_cabin_temp_c=None))
+
+        self.assertEqual(log.max_cabin_temp_c, 29.0)
+
+    def test_max_cabin_temp_is_none_when_all_temps_none(self):
+        log = CareReportLog()
+        log.add_report(make_report(max_cabin_temp_c=None))
+        log.add_report(make_report(max_cabin_temp_c=None))
+
+        self.assertIsNone(log.max_cabin_temp_c)
+
+    def test_average_duration_ignores_none_durations(self):
+        log = CareReportLog()
+        log.add_report(make_report(duration_seconds=100.0))
+        log.add_report(make_report(duration_seconds=None))
+        log.add_report(make_report(duration_seconds=200.0))
+
+        self.assertEqual(log.average_duration_seconds, 150.0)
+
+    def test_average_duration_is_none_when_all_durations_none(self):
+        log = CareReportLog()
+        log.add_report(make_report(duration_seconds=None))
+        log.add_report(make_report(duration_seconds=None))
+
+        self.assertIsNone(log.average_duration_seconds)
+
+    def test_stats_from_real_sessions_via_add_session(self):
+        normal = CareSession()
+        complete_normally(normal, start=1000.0)
+        recovered = CareSession()
+        drive_to_exception(recovered, start=2000.0)
+        recovered.apply_snapshot(
+            snapshot(rear_door=DoorState.OPEN, timestamp=2130.0)
+        )
+        recovered.apply_snapshot(snapshot(timestamp=2140.0))
+        log = CareReportLog()
+
+        first = log.add_session(normal)
+        second = log.add_session(recovered)
+
+        self.assertTrue(first.completed)
+        self.assertTrue(second.completed)
+        self.assertTrue(second.exception_occurred)
+        self.assertEqual(first.duration_seconds, 120.0)
+        self.assertEqual(second.duration_seconds, 140.0)
+        self.assertEqual(log.total_exception_count, 1)
+        self.assertEqual(log.average_duration_seconds, 130.0)
+        self.assertIsNone(log.max_cabin_temp_c)
+
+
 if __name__ == "__main__":
     unittest.main()

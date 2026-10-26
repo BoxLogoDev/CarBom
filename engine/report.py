@@ -7,6 +7,8 @@
 예외 여부는 전이 이력에 EXCEPTION 진입이 있는지로 정한다.
 소요 시각은 첫 전이와 마지막 전이의 timestamp 차이로 정한다.
 최대 실내 온도는 전이 이력 스냅샷들과 현재 스냅샷 중에서 정한다.
+누적함의 집계는 리포트 값들에서만 계산한다. 온도·소요 시간이 없는
+리포트는 그 집계에서 빼고, 대상이 하나도 없으면 None 이다.
 """
 
 from __future__ import annotations
@@ -136,6 +138,39 @@ class CareReportLog:
         return sum(
             1 for report in self._reports if report.exception_occurred
         )
+
+    @property
+    def total_exception_count(self) -> int:
+        """누적된 모든 리포트의 예외 진입 횟수 합계."""
+        return sum(report.exception_count for report in self._reports)
+
+    @property
+    def max_cabin_temp_c(self) -> float | None:
+        """누적된 모든 리포트의 최대 실내 온도 중 가장 큰 값.
+
+        온도가 기록된 리포트가 하나도 없으면 None이다.
+        """
+        temps = [
+            report.max_cabin_temp_c
+            for report in self._reports
+            if report.max_cabin_temp_c is not None
+        ]
+        return max(temps) if temps else None
+
+    @property
+    def average_duration_seconds(self) -> float | None:
+        """소요 시간이 기록된 리포트들의 평균 소요 시간(초).
+
+        소요 시간이 기록된 리포트가 하나도 없으면 None이다.
+        """
+        durations = [
+            report.duration_seconds
+            for report in self._reports
+            if report.duration_seconds is not None
+        ]
+        if not durations:
+            return None
+        return sum(durations) / len(durations)
 
 
 __all__ = [
