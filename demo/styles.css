@@ -1,0 +1,284 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  color: #1c2430;
+  background: #eef1f4;
+  line-height: 1.5;
+}
+
+.page-header {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 28px 20px 8px;
+}
+
+.page-header h1 {
+  margin: 0 0 6px;
+  font-size: 26px;
+}
+
+.page-lead {
+  margin: 0;
+  color: #3d4a5c;
+  font-size: 15px;
+}
+
+main {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 16px 20px 36px;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  background: #ffffff;
+  border: 1px solid #d3dbe3;
+  border-radius: 10px;
+}
+
+.controls label {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.controls select {
+  padding: 8px 10px;
+  font-size: 14px;
+  color: #1c2430;
+  background: #ffffff;
+  border: 1px solid #9fb0c1;
+  border-radius: 6px;
+}
+
+.controls button {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+  background: #14532d;
+  border: 1px solid #14532d;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.controls button#reset {
+  color: #1c2430;
+  background: #ffffff;
+  border-color: #9fb0c1;
+}
+
+.controls button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.step-indicator {
+  margin-left: auto;
+  font-size: 14px;
+  color: #3d4a5c;
+}
+
+#step-indicator {
+  font-weight: 700;
+  color: #1c2430;
+}
+
+.panels {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.panel {
+  background: #ffffff;
+  border: 1px solid #d3dbe3;
+  border-radius: 10px;
+  padding: 18px 20px 20px;
+}
+
+.vehicle-panel {
+  flex: 3 1 0;
+}
+
+.phone-panel {
+  flex: 2 1 0;
+}
+
+.panel h2 {
+  margin: 0 0 14px;
+  font-size: 19px;
+}
+
+.panel h3 {
+  margin: 18px 0 8px;
+  font-size: 15px;
+}
+
+.status-list,
+.signal-list {
+  margin: 0;
+}
+
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid #e4eaf0;
+  font-size: 14px;
+}
+
+.status-row dt {
+  color: #3d4a5c;
+}
+
+.status-row dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: right;
+}
+
+.guidance-label {
+  margin: 16px 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #3d4a5c;
+}
+
+.guidance-text {
+  margin: 0;
+  min-height: 48px;
+  padding: 12px 14px;
+  font-size: 15px;
+  background: #f4f7fa;
+  border: 1px solid #d3dbe3;
+  border-radius: 6px;
+}
+
+.level-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.level-none {
+  color: #3d4a5c;
+  background: #e7edf2;
+  border-color: #c2ceda;
+}
+
+.level-info {
+  color: #0b4f6c;
+  background: #dff0f7;
+  border-color: #8fc3d9;
+}
+
+.level-remind {
+  color: #7c4a03;
+  background: #fdf0d3;
+  border-color: #e5bd60;
+}
+
+.level-urgent {
+  color: #8c1d18;
+  background: #fde1de;
+  border-color: #e08a83;
+}
+
+.phone-frame {
+  max-width: 320px;
+  margin: 0 auto;
+  padding: 16px 14px 22px;
+  background: #20262e;
+  border-radius: 22px;
+}
+
+.phone-title {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #cfd8e2;
+  text-align: center;
+}
+
+.phone-card {
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid #c2ceda;
+  background: #ffffff;
+}
+
+.phone-card.level-none {
+  background: #f1f4f7;
+}
+
+.phone-card.level-info {
+  background: #eef7fb;
+  border-color: #8fc3d9;
+}
+
+.phone-card.level-remind {
+  background: #fff8e8;
+  border-color: #e5bd60;
+}
+
+.phone-card.level-urgent,
+.phone-card.is-warning {
+  background: #fdecea;
+  border: 2px solid #c0392b;
+}
+
+.phone-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0 0 10px;
+}
+
+.phone-state {
+  font-size: 12px;
+  font-weight: 700;
+  color: #3d4a5c;
+}
+
+.phone-card.is-warning .phone-state {
+  color: #8c1d18;
+}
+
+.phone-text {
+  margin: 0;
+  min-height: 66px;
+  font-size: 14px;
+}
+
+.phone-card.is-warning .phone-text {
+  font-weight: 700;
+  color: #8c1d18;
+}
+
+@media (max-width: 720px) {
+  .panels {
+    flex-direction: column;
+  }
+
+  .vehicle-panel,
+  .phone-panel {
+    width: 100%;
+  }
+
+  .step-indicator {
+    margin-left: 0;
+  }
+}

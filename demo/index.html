@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>카봄(CarBom) 웹 데모</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="page-header">
+<h1>카봄(CarBom) 웹 데모</h1>
+<p class="page-lead">뒷좌석 동승자 하차 확인 안내를 단계별로 살펴보는 정적 데모입니다.</p>
+</header>
+<main>
+<section class="controls" aria-label="데모 조작">
+<label for="scenario-select">시나리오</label>
+<select id="scenario-select">
+<option value="dropoff_normal">등원 정상 흐름</option>
+<option value="forgotten_rising_temp">하차 깜빡 + 온도 상승</option>
+<option value="pet_dropoff">반려동물 등원</option>
+</select>
+<button id="next-step" type="button">다음 단계</button>
+<button id="reset" type="button">처음부터</button>
+<span class="step-indicator">현재 단계 <span id="step-indicator">1/6</span></span>
+</section>
+<div class="panels">
+<section class="panel vehicle-panel" aria-label="차량 화면">
+<h2>차량 화면</h2>
+<dl class="status-list">
+<div class="status-row">
+<dt>현재 세션 상태</dt>
+<dd id="vehicle-state">BOARDING</dd>
+</div>
+<div class="status-row">
+<dt>안내 단계</dt>
+<dd><span id="guidance-level" class="level-badge level-info">INFO</span></dd>
+</div>
+</dl>
+<p class="guidance-label">안내 문구</p>
+<p id="guidance-text" class="guidance-text"></p>
+<h3>신호 지표</h3>
+<dl class="signal-list">
+<div class="status-row"><dt>뒷문</dt><dd id="sig-door">-</dd></div>
+<div class="status-row"><dt>후석 벨트</dt><dd id="sig-belt">-</dd></div>
+<div class="status-row"><dt>시동</dt><dd id="sig-ignition">-</dd></div>
+<div class="status-row"><dt>잠금</dt><dd id="sig-lock">-</dd></div>
+<div class="status-row"><dt>공조</dt><dd id="sig-hvac">-</dd></div>
+<div class="status-row"><dt>실내 온도</dt><dd id="sig-temp">-</dd></div>
+</dl>
+</section>
+<section class="panel phone-panel" aria-label="운전자 폰 화면">
+<h2>운전자 폰 화면</h2>
+<div class="phone-frame">
+<p class="phone-title">차량 안내 알림</p>
+<article id="phone-card" class="phone-card level-info">
+<p class="phone-card-head">
+<span id="phone-level" class="level-badge level-info">INFO</span>
+<span id="phone-state" class="phone-state">BOARDING</span>
+</p>
+<p id="phone-text" class="phone-text"></p>
+</article>
+</div>
+</section>
+</div>
+</main>
+<script src="demo.js"></script>
+</body>
+</html>
