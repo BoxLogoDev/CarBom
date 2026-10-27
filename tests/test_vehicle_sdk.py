@@ -7,7 +7,14 @@
 
 import unittest
 
-from engine.adapters import VehicleSdkAdapter, raw_from_snapshot, snapshot_from_raw
+from engine.adapters import (
+    VehicleSdkAdapter,
+    raw_from_snapshot,
+    raws_from_snapshots,
+    snapshot_from_raw,
+    snapshots_from_raws,
+)
+from engine.adapters.simulator import scenario_snapshots
 from engine.session import CareSession, SessionState
 from engine.signals import DoorState, IgnitionState, LockState, SignalSnapshot
 
@@ -121,6 +128,58 @@ class RawFromSnapshotTest(unittest.TestCase):
                 "cabin_temp_c",
                 "timestamp",
             },
+        )
+
+
+class BulkConversionTest(unittest.TestCase):
+    RAWS = [
+        {"rear_door_open": True, "timestamp": 0.0},
+        {"rear_seat_belt_buckled": True, "timestamp": 60.0},
+        {"locked": True, "cabin_temp_c": 35.5, "timestamp": 120.0},
+    ]
+
+    def test_empty_input_gives_empty_tuple(self):
+        self.assertEqual(snapshots_from_raws([]), ())
+        self.assertEqual(raws_from_snapshots([]), ())
+
+    def test_order_and_fields_are_preserved(self):
+        snaps = snapshots_from_raws(self.RAWS)
+        self.assertEqual(len(snaps), 3)
+        self.assertTrue(snaps[0].rear_door_open)
+        self.assertEqual(snaps[0].timestamp, 0.0)
+        self.assertTrue(snaps[1].rear_seat_belt_buckled)
+        self.assertEqual(snaps[1].timestamp, 60.0)
+        self.assertTrue(snaps[2].locked)
+        self.assertEqual(snaps[2].cabin_temp_c, 35.5)
+        self.assertEqual(snaps[2].timestamp, 120.0)
+
+    def test_raws_round_trip_through_snapshots(self):
+        self.assertEqual(
+            raws_from_snapshots(snapshots_from_raws([FULL_RAW])),
+            (FULL_RAW,),
+        )
+
+    def test_snapshots_round_trip_through_raws(self):
+        snaps = snapshots_from_raws(self.RAWS)
+        self.assertEqual(
+            snapshots_from_raws(raws_from_snapshots(snaps)), snaps
+        )
+
+    def test_generator_input_matches_list_input(self):
+        self.assertEqual(
+            snapshots_from_raws(iter(self.RAWS)),
+            snapshots_from_raws(self.RAWS),
+        )
+        snaps = snapshots_from_raws(self.RAWS)
+        self.assertEqual(
+            raws_from_snapshots(iter(snaps)),
+            raws_from_snapshots(snaps),
+        )
+
+    def test_scenario_snapshots_round_trip(self):
+        original = scenario_snapshots("dropoff_normal")
+        self.assertEqual(
+            snapshots_from_raws(raws_from_snapshots(original)), original
         )
 
 

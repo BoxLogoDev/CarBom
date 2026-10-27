@@ -13,7 +13,7 @@ SDK 쪽 원시 신호(dict)를 엔진의 SignalSnapshot으로 바꾸는 변환�
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING, Any
 
 from engine.signals import DoorState, IgnitionState, LockState, SignalSnapshot
@@ -24,7 +24,9 @@ if TYPE_CHECKING:
 __all__ = [
     "VehicleSdkAdapter",
     "raw_from_snapshot",
+    "raws_from_snapshots",
     "snapshot_from_raw",
+    "snapshots_from_raws",
 ]
 
 
@@ -73,6 +75,28 @@ def raw_from_snapshot(snapshot: SignalSnapshot) -> dict:
         "cabin_temp_c": snapshot.cabin_temp_c,
         "timestamp": snapshot.timestamp,
     }
+
+
+def snapshots_from_raws(
+    raws: Iterable[Mapping[str, Any]],
+) -> tuple[SignalSnapshot, ...]:
+    """원시 신호 dict 시퀀스를 SignalSnapshot tuple로 바꾼다.
+
+    snapshot_from_raw의 대량 변환이다.
+    입력 순서를 그대로 유지하고, 빈 입력이면 빈 tuple을 돌려준다.
+    """
+    return tuple(snapshot_from_raw(raw) for raw in raws)
+
+
+def raws_from_snapshots(
+    snapshots: Iterable[SignalSnapshot],
+) -> tuple[dict, ...]:
+    """SignalSnapshot 시퀀스를 원시 신호 dict tuple로 바꾼다.
+
+    raw_from_snapshot의 대량 변환이며 snapshots_from_raws의 역변환이다.
+    입력 순서를 그대로 유지하고, 빈 입력이면 빈 tuple을 돌려준다.
+    """
+    return tuple(raw_from_snapshot(snapshot) for snapshot in snapshots)
 
 
 class VehicleSdkAdapter:

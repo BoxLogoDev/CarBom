@@ -12,7 +12,9 @@ from engine.adapters.simulator import (
 from engine.adapters.vehicle_sdk import (
     VehicleSdkAdapter,
     raw_from_snapshot,
+    raws_from_snapshots,
     snapshot_from_raw,
+    snapshots_from_raws,
 )
 
 __all__ = [
@@ -21,9 +23,11 @@ __all__ = [
     "dropoff_normal_snapshots",
     "forgotten_rising_temp_snapshots",
     "pet_dropoff_snapshots",
+    "raws_from_snapshots",
     "replay",
     "replay_scenario",
     "raw_from_snapshot",
     "scenario_snapshots",
     "snapshot_from_raw",
+    "snapshots_from_raws",
 ]
