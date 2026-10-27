@@ -12,6 +12,7 @@ from engine import (
     SessionState,
     SignalSnapshot,
     report_for_session,
+    reports_for_sessions,
 )
 
 
@@ -361,6 +362,82 @@ class CareReportLogStatsTest(unittest.TestCase):
         self.assertEqual(log.total_exception_count, 1)
         self.assertEqual(log.average_duration_seconds, 130.0)
         self.assertIsNone(log.max_cabin_temp_c)
+
+
+class ReportsForSessionsTest(unittest.TestCase):
+    def test_empty_input_returns_empty_tuple(self):
+        self.assertEqual(reports_for_sessions([]), ())
+        self.assertEqual(reports_for_sessions(()), ())
+
+    def test_converts_sessions_in_order_matching_individual_reports(self):
+        completed = CareSession()
+        complete_normally(completed, start=1000.0)
+        exception = CareSession()
+        drive_to_exception(exception, start=2000.0)
+
+        reports = reports_for_sessions([completed, exception])
+
+        self.assertIsInstance(reports, tuple)
+        self.assertEqual(len(reports), 2)
+        self.assertEqual(reports[0], report_for_session(completed))
+        self.assertEqual(reports[1], report_for_session(exception))
+        self.assertEqual(reports[0].final_state, SessionState.COMPLETED)
+        self.assertTrue(reports[0].completed)
+        self.assertFalse(reports[0].exception_occurred)
+        self.assertEqual(reports[1].final_state, SessionState.EXCEPTION)
+        self.assertFalse(reports[1].completed)
+        self.assertTrue(reports[1].exception_occurred)
+
+    def test_does_not_mutate_sessions(self):
+        session = CareSession()
+        board_and_drive(session, start=1000.0)
+        state_before = session.state
+        history_before = list(session.history)
+        passenger_before = session.passenger_present
+        snapshot_before = session.current_snapshot
+
+        reports_for_sessions([session, session])
+
+        self.assertEqual(session.state, state_before)
+        self.assertEqual(session.history, history_before)
+        self.assertEqual(session.passenger_present, passenger_before)
+        self.assertEqual(session.current_snapshot, snapshot_before)
+
+    def test_accepts_generator_input(self):
+        completed = CareSession()
+        complete_normally(completed, start=1000.0)
+
+        reports = reports_for_sessions(s for s in [completed])
+
+        self.assertEqual(len(reports), 1)
+        self.assertTrue(reports[0].completed)
+
+    def test_add_sessions_accumulates_and_returns_reports(self):
+        completed = CareSession()
+        complete_normally(completed, start=1000.0)
+        exception = CareSession()
+        drive_to_exception(exception, start=2000.0)
+        log = CareReportLog()
+
+        returned = log.add_sessions([completed, exception])
+
+        self.assertIsInstance(returned, tuple)
+        self.assertEqual(returned, log.reports)
+        self.assertEqual(len(log), 2)
+        self.assertEqual(log.completed_count, 1)
+        self.assertEqual(log.sessions_with_exception, 1)
+        self.assertEqual(log.total_exception_count, 1)
+
+    def test_add_sessions_empty_input_leaves_log_unchanged(self):
+        log = CareReportLog()
+        log.add_session(CareSession())
+        reports_before = log.reports
+
+        returned = log.add_sessions([])
+
+        self.assertEqual(returned, ())
+        self.assertEqual(len(log), 1)
+        self.assertEqual(log.reports, reports_before)
 
 
 if __name__ == "__main__":

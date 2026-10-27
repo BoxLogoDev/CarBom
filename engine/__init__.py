@@ -14,7 +14,12 @@ from engine.profiles import (
     needs_manual_confirmation,
     profile_for,
 )
-from engine.report import CareReport, CareReportLog, report_for_session
+from engine.report import (
+    CareReport,
+    CareReportLog,
+    report_for_session,
+    reports_for_sessions,
+)
 from engine.session import CareSession, SessionState, StateTransition
 from engine.signals import (
     DoorState,
@@ -48,4 +53,5 @@ __all__ = [
     "needs_manual_confirmation",
     "profile_for",
     "report_for_session",
+    "reports_for_sessions",
 ]

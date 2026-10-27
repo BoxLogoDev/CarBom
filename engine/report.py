@@ -9,10 +9,13 @@
 최대 실내 온도는 전이 이력 스냅샷들과 현재 스냅샷 중에서 정한다.
 누적함의 집계는 리포트 값들에서만 계산한다. 온도·소요 시간이 없는
 리포트는 그 집계에서 빼고, 대상이 하나도 없으면 None 이다.
+대량 헬퍼는 세션들을 입력 순서대로 읽어 리포트들을 돌려주며,
+세션을 바꾸지 않는다.
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 
 from engine.session import CareSession, SessionState, StateTransition
@@ -103,6 +106,17 @@ def report_for_session(session: CareSession) -> CareReport:
     )
 
 
+def reports_for_sessions(
+    sessions: Iterable[CareSession],
+) -> tuple[CareReport, ...]:
+    """세션들을 순서대로 읽어 케어 리포트들을 돌려준다. 세션은 바꾸지 않는다.
+
+    report_for_session의 대량 변환이다.
+    입력 순서를 그대로 유지하고, 빈 입력이면 빈 tuple을 돌려준다.
+    """
+    return tuple(report_for_session(session) for session in sessions)
+
+
 @dataclass
 class CareReportLog:
     """케어 리포트 누적함."""
@@ -118,6 +132,19 @@ class CareReportLog:
         report = report_for_session(session)
         self.add_report(report)
         return report
+
+    def add_sessions(
+        self, sessions: Iterable[CareSession]
+    ) -> tuple[CareReport, ...]:
+        """세션들의 리포트를 만들어 순서대로 누적하고 돌려준다.
+
+        add_session의 대량 적용이다.
+        빈 입력이면 빈 tuple을 돌려주고 누적함은 변하지 않는다.
+        """
+        reports = reports_for_sessions(sessions)
+        for report in reports:
+            self.add_report(report)
+        return reports
 
     @property
     def reports(self) -> tuple[CareReport, ...]:
@@ -177,4 +204,5 @@ __all__ = [
     "CareReport",
     "CareReportLog",
     "report_for_session",
+    "reports_for_sessions",
 ]
