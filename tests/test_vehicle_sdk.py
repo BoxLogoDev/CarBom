@@ -9,6 +9,8 @@ import unittest
 
 from engine.adapters import (
     VehicleSdkAdapter,
+    apply_raw,
+    apply_raws,
     raw_from_snapshot,
     raws_from_snapshots,
     snapshot_from_raw,
@@ -288,6 +290,53 @@ class PollIntoTest(unittest.TestCase):
         )
         adapter.poll_into(session)
         self.assertEqual(session.current_snapshot.cabin_temp_c, 35.5)
+
+
+class ApplyRawTest(unittest.TestCase):
+    def test_apply_raws_with_empty_input_leaves_session_idle(self):
+        session = CareSession()
+        state = apply_raws(session, [])
+        self.assertEqual(state, SessionState.IDLE)
+        self.assertEqual(session.state, SessionState.IDLE)
+        self.assertEqual(session.history, [])
+
+    def test_apply_raw_rear_door_open_moves_session_to_boarding(self):
+        session = CareSession()
+        state = apply_raw(session, {"rear_door_open": True})
+        self.assertEqual(state, SessionState.BOARDING)
+        self.assertEqual(state, session.state)
+
+    def test_apply_raws_normal_flow_reaches_completed(self):
+        raws = raws_from_snapshots(scenario_snapshots("dropoff_normal"))
+        session = CareSession()
+        state = apply_raws(session, raws)
+        self.assertEqual(state, SessionState.COMPLETED)
+        self.assertEqual(session.state, SessionState.COMPLETED)
+
+    def test_apply_raw_locked_with_passenger_moves_session_to_exception(self):
+        session = CareSession()
+        apply_raw(session, {"rear_door_open": True})
+        apply_raw(session, {"rear_seat_belt_buckled": True})
+        state = apply_raw(
+            session,
+            {
+                "rear_seat_belt_buckled": True,
+                "locked": True,
+                "cabin_temp_c": 35.5,
+            },
+        )
+        self.assertEqual(state, SessionState.EXCEPTION)
+        self.assertEqual(session.state, SessionState.EXCEPTION)
+        self.assertEqual(session.current_snapshot.cabin_temp_c, 35.5)
+
+    def test_apply_raws_generator_input_matches_list_input(self):
+        raws = raws_from_snapshots(scenario_snapshots("dropoff_normal"))
+        list_session = CareSession()
+        generator_session = CareSession()
+        list_state = apply_raws(list_session, raws)
+        generator_state = apply_raws(generator_session, iter(raws))
+        self.assertEqual(generator_state, list_state)
+        self.assertEqual(generator_session.state, list_session.state)
 
 
 if __name__ == "__main__":

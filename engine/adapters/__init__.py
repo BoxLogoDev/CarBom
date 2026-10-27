@@ -11,6 +11,8 @@ from engine.adapters.simulator import (
 )
 from engine.adapters.vehicle_sdk import (
     VehicleSdkAdapter,
+    apply_raw,
+    apply_raws,
     raw_from_snapshot,
     raws_from_snapshots,
     snapshot_from_raw,
@@ -20,6 +22,8 @@ from engine.adapters.vehicle_sdk import (
 __all__ = [
     "SCENARIO_NAMES",
     "VehicleSdkAdapter",
+    "apply_raw",
+    "apply_raws",
     "dropoff_normal_snapshots",
     "forgotten_rising_temp_snapshots",
     "pet_dropoff_snapshots",

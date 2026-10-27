@@ -23,6 +23,8 @@ if TYPE_CHECKING:
 
 __all__ = [
     "VehicleSdkAdapter",
+    "apply_raw",
+    "apply_raws",
     "raw_from_snapshot",
     "raws_from_snapshots",
     "snapshot_from_raw",
@@ -97,6 +99,31 @@ def raws_from_snapshots(
     입력 순서를 그대로 유지하고, 빈 입력이면 빈 tuple을 돌려준다.
     """
     return tuple(raw_from_snapshot(snapshot) for snapshot in snapshots)
+
+
+def apply_raw(
+    session: CareSession, raw: Mapping[str, Any]
+) -> SessionState:
+    """원시 신호 dict를 스냅샷으로 바꿔 세션에 적용하고 세션 상태를 돌려준다.
+
+    snapshot_from_raw(raw)를 session.apply_snapshot(...)에 넘긴 것과 같다.
+    SDK 클라이언트 없이도 raw를 세션에 바로 넣을 수 있는 직접 경로이다.
+    """
+    return session.apply_snapshot(snapshot_from_raw(raw))
+
+
+def apply_raws(
+    session: CareSession, raws: Iterable[Mapping[str, Any]]
+) -> SessionState:
+    """원시 신호 dict를 순서대로 세션에 적용하고 최종 상태를 돌려준다.
+
+    apply_raw의 대량 적용이다.
+    빈 입력이면 세션을 변경하지 않고 현재 상태를 그대로 돌려준다.
+    """
+    state = session.state
+    for raw in raws:
+        state = apply_raw(session, raw)
+    return state
 
 
 class VehicleSdkAdapter:
