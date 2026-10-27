@@ -14,9 +14,12 @@ SDK 쪽 원시 신호(dict)를 엔진의 SignalSnapshot으로 바꾸는 변환�
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from engine.signals import DoorState, IgnitionState, LockState, SignalSnapshot
+
+if TYPE_CHECKING:
+    from engine.session import CareSession, SessionState
 
 __all__ = [
     "VehicleSdkAdapter",
@@ -101,3 +104,12 @@ class VehicleSdkAdapter:
                 "지금은 시뮬레이션 어댑터를 사용하십시오."
             )
         return snapshot_from_raw(self._client.read_raw())
+
+    def poll_into(self, session: CareSession) -> SessionState:
+        """현재 차량 신호를 한 번 읽어 세션에 적용하고 세션 상태를 돌려준다.
+
+        Raises:
+            NotImplementedError: SDK 클라이언트가 연결되지 않았으면 낸다.
+                이때 poll()이 먼저 실패하므로 세션은 변경되지 않는다.
+        """
+        return session.apply_snapshot(self.poll())

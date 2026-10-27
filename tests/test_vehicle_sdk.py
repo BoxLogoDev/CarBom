@@ -8,6 +8,7 @@
 import unittest
 
 from engine.adapters import VehicleSdkAdapter, raw_from_snapshot, snapshot_from_raw
+from engine.session import CareSession, SessionState
 from engine.signals import DoorState, IgnitionState, LockState, SignalSnapshot
 
 
@@ -155,6 +156,79 @@ class VehicleSdkAdapterTest(unittest.TestCase):
             ).poll()
         )
         self.assertEqual(state, SessionState.EXCEPTION)
+
+
+class FakeSequenceSdkClient:
+    """read_raw()가 호출할 때마다 다음 dict를 돌려주는 가짜 SDK 클라이언트."""
+
+    def __init__(self, raws):
+        self._raws = list(raws)
+        self.calls = 0
+
+    def read_raw(self):
+        raw = self._raws[self.calls]
+        self.calls += 1
+        return raw
+
+
+class PollIntoTest(unittest.TestCase):
+    def test_poll_into_without_client_fails_and_leaves_session_idle(self):
+        session = CareSession()
+        with self.assertRaises(NotImplementedError):
+            VehicleSdkAdapter().poll_into(session)
+        self.assertEqual(session.state, SessionState.IDLE)
+        self.assertEqual(session.history, [])
+
+    def test_poll_into_rear_door_open_moves_session_to_boarding(self):
+        session = CareSession()
+        adapter = VehicleSdkAdapter(
+            FakeSdkClient({"rear_door_open": True})
+        )
+        state = adapter.poll_into(session)
+        self.assertEqual(state, SessionState.BOARDING)
+        self.assertEqual(session.state, SessionState.BOARDING)
+
+    def test_poll_into_normal_flow_reaches_completed(self):
+        raws = [
+            raw_from_snapshot(SignalSnapshot(rear_door=DoorState.OPEN)),
+            raw_from_snapshot(SignalSnapshot(rear_seat_belt_buckled=True)),
+            raw_from_snapshot(
+                SignalSnapshot(
+                    rear_seat_belt_buckled=True, ignition=IgnitionState.ON
+                )
+            ),
+            raw_from_snapshot(SignalSnapshot(rear_seat_belt_buckled=True)),
+            raw_from_snapshot(SignalSnapshot(rear_door=DoorState.OPEN)),
+            raw_from_snapshot(SignalSnapshot()),
+        ]
+        session = CareSession()
+        adapter = VehicleSdkAdapter(FakeSequenceSdkClient(raws))
+        state = None
+        for _ in raws:
+            state = adapter.poll_into(session)
+        self.assertEqual(state, SessionState.COMPLETED)
+        self.assertEqual(session.state, SessionState.COMPLETED)
+
+    def test_poll_into_locked_with_passenger_moves_session_to_exception(self):
+        session = CareSession()
+        session.apply_snapshot(snapshot_from_raw({"rear_door_open": True}))
+        session.apply_snapshot(
+            snapshot_from_raw({"rear_seat_belt_buckled": True})
+        )
+        adapter = VehicleSdkAdapter(
+            FakeSdkClient({"rear_seat_belt_buckled": True, "locked": True})
+        )
+        state = adapter.poll_into(session)
+        self.assertEqual(state, SessionState.EXCEPTION)
+        self.assertEqual(session.state, SessionState.EXCEPTION)
+
+    def test_poll_into_updates_session_current_snapshot(self):
+        session = CareSession()
+        adapter = VehicleSdkAdapter(
+            FakeSdkClient({"cabin_temp_c": 35.5})
+        )
+        adapter.poll_into(session)
+        self.assertEqual(session.current_snapshot.cabin_temp_c, 35.5)
 
 
 if __name__ == "__main__":
