@@ -7,6 +7,7 @@ from engine import (
     PassengerProfile,
     needs_manual_confirmation,
     profile_for,
+    profiles_for,
 )
 from engine.profiles import all_profiles
 
@@ -35,6 +36,54 @@ class TestProfileFor(unittest.TestCase):
     def test_string_parsing_ignores_case_and_spaces(self):
         self.assertEqual(profile_for(" ELDER ").kind, PassengerKind.ELDER)
         self.assertEqual(profile_for("Child").kind, PassengerKind.CHILD)
+
+
+class ProfilesForTest(unittest.TestCase):
+    def test_empty_input_returns_empty_tuple(self):
+        self.assertEqual(profiles_for([]), ())
+        self.assertEqual(profiles_for(iter(())), ())
+
+    def test_enum_list_preserves_order_and_matches_profile_for(self):
+        kinds = [PassengerKind.PET, PassengerKind.CHILD, PassengerKind.ADULT]
+        result = profiles_for(kinds)
+        self.assertEqual(result, tuple(profile_for(kind) for kind in kinds))
+        self.assertEqual(
+            [p.kind for p in result],
+            [PassengerKind.PET, PassengerKind.CHILD, PassengerKind.ADULT],
+        )
+
+    def test_mixed_string_none_and_unknown_inputs_match_profile_for(self):
+        kinds = ["pet", None, " unknown ", " ELDER "]
+        result = profiles_for(kinds)
+        self.assertEqual(result, tuple(profile_for(kind) for kind in kinds))
+        self.assertEqual(
+            [p.kind for p in result],
+            [
+                PassengerKind.PET,
+                PassengerKind.ADULT,
+                PassengerKind.ADULT,
+                PassengerKind.ELDER,
+            ],
+        )
+
+    def test_generator_input_matches_list_input(self):
+        kinds = [PassengerKind.CHILD, "pet", None]
+        from_list = profiles_for(kinds)
+        from_generator = profiles_for(kind for kind in kinds)
+        self.assertEqual(from_generator, from_list)
+        self.assertEqual(len(from_generator), 3)
+
+    def test_duplicate_inputs_are_kept(self):
+        result = profiles_for([PassengerKind.PET, PassengerKind.PET])
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0], profile_for(PassengerKind.PET))
+        self.assertEqual(result[1], profile_for(PassengerKind.PET))
+
+    def test_result_is_tuple_of_passenger_profiles(self):
+        result = profiles_for([PassengerKind.CHILD, "adult"])
+        self.assertIsInstance(result, tuple)
+        for profile in result:
+            self.assertIsInstance(profile, PassengerProfile)
 
 
 class TestNeedsManualConfirmation(unittest.TestCase):

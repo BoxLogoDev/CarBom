@@ -14,6 +14,7 @@ from engine.profiles import (
     all_profiles,
     needs_manual_confirmation,
     profile_for,
+    profiles_for,
 )
 from engine.report import (
     CareReport,
@@ -54,6 +55,7 @@ __all__ = [
     "guidances_for_sessions",
     "needs_manual_confirmation",
     "profile_for",
+    "profiles_for",
     "report_for_session",
     "reports_for_sessions",
 ]

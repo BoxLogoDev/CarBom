@@ -5,10 +5,13 @@
 반려동물은 이동장이 벨트로 고정되면 벨트로 감지한다.
 반려동물은 벨트가 체결되지 않으면 수동 탑승 확인이 필요하다.
 그 밖의 종류는 벨트 미체결이어도 수동 확인을 요구하지 않는다.
+대량 헬퍼 profiles_for는 종류들을 순서대로 읽어 프로필 tuple을 돌려준다.
+알 수 없는 값은 profile_for와 같이 성인 프로필로 처리한다.
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
 
@@ -97,6 +100,17 @@ def profile_for(kind: PassengerKind | str | None) -> PassengerProfile:
     return _PROFILES[_normalize_kind(kind)]
 
 
+def profiles_for(
+    kinds: Iterable[PassengerKind | str | None],
+) -> tuple[PassengerProfile, ...]:
+    """종류들을 순서대로 읽어 프로필들을 돌려준다.
+
+    profile_for의 대량 변환이다.
+    입력 순서를 그대로 유지하고, 빈 입력이면 빈 tuple을 돌려준다.
+    """
+    return tuple(profile_for(kind) for kind in kinds)
+
+
 def all_profiles() -> tuple[PassengerProfile, ...]:
     """모든 프로필을 아이·반려동물·부모님·성인 순서로 돌려준다."""
     return tuple(_PROFILES[kind] for kind in PassengerKind)
@@ -121,4 +135,5 @@ __all__ = [
     "all_profiles",
     "needs_manual_confirmation",
     "profile_for",
+    "profiles_for",
 ]
