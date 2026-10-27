@@ -9,6 +9,7 @@ from engine.adapters import (
     forgotten_rising_temp_snapshots,
     pet_dropoff_snapshots,
     replay,
+    replay_scenario,
     scenario_snapshots,
 )
 
@@ -110,6 +111,41 @@ class SimulatorTest(unittest.TestCase):
         )
         self.assertEqual(timestamps[0], 1000.0)
         self.assertEqual(timestamps[-1], 1300.0)
+
+
+class ReplayScenarioTest(unittest.TestCase):
+    def test_dropoff_normal_replays_to_completed(self):
+        session = CareSession()
+
+        state = replay_scenario(session, "dropoff_normal")
+
+        self.assertEqual(state, SessionState.COMPLETED)
+        self.assertEqual(state, session.state)
+
+    def test_forgotten_rising_temp_replays_to_exception(self):
+        session = CareSession()
+
+        state = replay_scenario(session, "forgotten_rising_temp")
+
+        self.assertEqual(state, SessionState.EXCEPTION)
+        self.assertTrue(session.passenger_present)
+
+    def test_pet_dropoff_start_shifts_first_transition(self):
+        session = CareSession()
+
+        state = replay_scenario(session, "pet_dropoff", start=1000.0)
+
+        self.assertEqual(state, SessionState.COMPLETED)
+        self.assertEqual(session.history[0].timestamp, 1000.0)
+
+    def test_unknown_name_raises_and_leaves_session_untouched(self):
+        session = CareSession()
+
+        with self.assertRaises(ValueError):
+            replay_scenario(session, "unknown_scenario")
+
+        self.assertEqual(session.state, SessionState.IDLE)
+        self.assertEqual(session.history, [])
 
 
 if __name__ == "__main__":

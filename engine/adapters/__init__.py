@@ -6,6 +6,7 @@ from engine.adapters.simulator import (
     forgotten_rising_temp_snapshots,
     pet_dropoff_snapshots,
     replay,
+    replay_scenario,
     scenario_snapshots,
 )
 from engine.adapters.vehicle_sdk import (
@@ -21,6 +22,7 @@ __all__ = [
     "forgotten_rising_temp_snapshots",
     "pet_dropoff_snapshots",
     "replay",
+    "replay_scenario",
     "raw_from_snapshot",
     "scenario_snapshots",
     "snapshot_from_raw",

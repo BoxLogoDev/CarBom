@@ -25,6 +25,7 @@ __all__ = [
     "forgotten_rising_temp_snapshots",
     "pet_dropoff_snapshots",
     "replay",
+    "replay_scenario",
     "scenario_snapshots",
 ]
 
@@ -146,3 +147,18 @@ def replay(
     for snapshot in snapshots:
         state = session.apply_snapshot(snapshot)
     return state
+
+
+def replay_scenario(
+    session: CareSession, name: str, start: float = 0.0
+) -> SessionState:
+    """이름으로 시나리오를 조회해 세션에 재생하고 최종 상태를 돌려준다.
+
+    VehicleSdkAdapter.poll_into와 짝을 이루는 시뮬레이터 쪽 편의 경로로,
+    scenario_snapshots(name, start)를 replay(session, ...)에 넘긴 것과 같다.
+
+    Raises:
+        ValueError: 알 수 없는 시나리오 이름이면 낸다.
+            조회가 먼저 실패하므로 세션은 변경되지 않는다.
+    """
+    return replay(session, scenario_snapshots(name, start))
