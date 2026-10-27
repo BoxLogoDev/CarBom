@@ -5,10 +5,13 @@
 목적지 맥락이 등원과 하원 표현을 바꾼다.
 실내 온도는 32도 이상에서 문구에 온도를 넣는다.
 실내 온도는 35도 이상에서 표현과 이유를 한 단계 올린다.
+대량 헬퍼는 세션들을 입력 순서대로 읽어 안내들을 돌려주며,
+세션을 바꾸지 않는다.
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum, IntEnum
 
@@ -225,10 +228,26 @@ def guidance_for_session(
     )
 
 
+def guidances_for_sessions(
+    sessions: Iterable[CareSession],
+    context: DestinationContext | str | None = DestinationContext.GENERAL,
+) -> tuple[Guidance, ...]:
+    """세션들을 순서대로 읽어 안내들을 돌려준다. 세션은 바꾸지 않는다.
+
+    guidance_for_session의 대량 변환이다.
+    입력 순서를 그대로 유지하고, 빈 입력이면 빈 tuple을 돌려준다.
+    """
+    return tuple(
+        guidance_for_session(session, context=context)
+        for session in sessions
+    )
+
+
 __all__ = [
     "DestinationContext",
     "Guidance",
     "GuidanceLevel",
     "guidance_for",
     "guidance_for_session",
+    "guidances_for_sessions",
 ]

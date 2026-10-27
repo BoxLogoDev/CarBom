@@ -13,6 +13,7 @@ from engine import (
     SignalSnapshot,
     guidance_for,
     guidance_for_session,
+    guidances_for_sessions,
 )
 
 
@@ -192,6 +193,90 @@ class GuidanceForSessionTest(unittest.TestCase):
 
         self.assertEqual(guidance.level, GuidanceLevel.URGENT)
         self.assertIn("36.5", guidance.text)
+
+
+class GuidancesForSessionsTest(unittest.TestCase):
+    def _arrived_session(self):
+        session = CareSession()
+        board_drive_and_arrive(session)
+        self.assertEqual(session.state, SessionState.ARRIVED)
+        return session
+
+    def test_empty_input_returns_empty_tuple(self):
+        self.assertEqual(guidances_for_sessions([]), ())
+        self.assertEqual(guidances_for_sessions(iter(())), ())
+
+    def test_order_preserved_and_matches_individual_calls(self):
+        idle = CareSession()
+        arrived = self._arrived_session()
+
+        result = guidances_for_sessions([arrived, idle])
+
+        self.assertEqual(len(result), 2)
+        for actual, session in zip(result, [arrived, idle]):
+            expected = guidance_for_session(session)
+            self.assertEqual(actual.level, expected.level)
+            self.assertEqual(actual.state, expected.state)
+            self.assertEqual(actual.text, expected.text)
+            self.assertEqual(actual.reason, expected.reason)
+        self.assertEqual(result[0].state, SessionState.ARRIVED)
+        self.assertEqual(result[0].level, GuidanceLevel.REMIND)
+        self.assertEqual(result[1].state, SessionState.IDLE)
+        self.assertEqual(result[1].level, GuidanceLevel.NONE)
+
+    def test_sessions_are_not_mutated(self):
+        arrived = self._arrived_session()
+        before = (
+            arrived.state,
+            len(arrived.history),
+            arrived.current_snapshot,
+            arrived.passenger_present,
+        )
+
+        guidances_for_sessions([arrived])
+
+        after = (
+            arrived.state,
+            len(arrived.history),
+            arrived.current_snapshot,
+            arrived.passenger_present,
+        )
+        self.assertEqual(after, before)
+
+    def test_generator_input_matches_list_input(self):
+        sessions = [CareSession(), self._arrived_session()]
+
+        from_list = guidances_for_sessions(sessions)
+        from_generator = guidances_for_sessions(s for s in sessions)
+
+        self.assertEqual(from_generator, from_list)
+
+    def test_context_is_propagated_to_each_session(self):
+        arrived = self._arrived_session()
+
+        default = guidances_for_sessions([arrived])
+        dropoff = guidances_for_sessions(
+            [arrived], context=DestinationContext.DROPOFF
+        )
+
+        self.assertIn("등원", dropoff[0].text)
+        self.assertNotEqual(dropoff[0].text, default[0].text)
+        self.assertEqual(
+            dropoff[0],
+            guidance_for_session(
+                arrived, context=DestinationContext.DROPOFF
+            ),
+        )
+
+    def test_string_context_matches_enum_context(self):
+        arrived = self._arrived_session()
+
+        from_string = guidances_for_sessions([arrived], context="dropoff")
+        from_enum = guidances_for_sessions(
+            [arrived], context=DestinationContext.DROPOFF
+        )
+
+        self.assertEqual(from_string, from_enum)
 
 
 if __name__ == "__main__":

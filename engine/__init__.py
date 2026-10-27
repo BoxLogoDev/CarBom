@@ -6,6 +6,7 @@ from engine.guidance import (
     GuidanceLevel,
     guidance_for,
     guidance_for_session,
+    guidances_for_sessions,
 )
 from engine.profiles import (
     PassengerKind,
@@ -50,6 +51,7 @@ __all__ = [
     "all_profiles",
     "guidance_for",
     "guidance_for_session",
+    "guidances_for_sessions",
     "needs_manual_confirmation",
     "profile_for",
     "report_for_session",
