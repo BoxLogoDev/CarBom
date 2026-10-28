@@ -185,6 +185,32 @@ class VehicleSdkAdapter:
         """
         return session.apply_snapshot(self.poll())
 
+    def poll_repeatedly_into(
+        self, session: CareSession, times: int
+    ) -> SessionState:
+        """현재 차량 신호를 times번 반복해서 읽어 세션에 적용하고 최종 상태를 돌려준다.
+
+        poll_into의 반복 적용이다.
+        simulator의 replay, raw 쪽 apply_raws와 짝을 이루는 poll 쪽
+        반복 적용 경로이다.
+        times가 0이면 poll()을 한 번도 호출하지 않고 현재 상태를
+        그대로 돌려주므로, 클라이언트 미연결 어댑터에서도 예외가 나지
+        않는다.
+
+        Raises:
+            ValueError: times가 음수이면 낸다.
+                poll()을 호출하지 않고 세션도 변경하지 않는다.
+            NotImplementedError: SDK 클라이언트가 연결되지 않았고
+                times가 양수이면 첫 poll()에서 낸다.
+                이때 세션은 변경되지 않는다.
+        """
+        if times < 0:
+            raise ValueError(f"times는 0 이상이어야 한다: {times}")
+        state = session.state
+        for _ in range(times):
+            state = self.poll_into(session)
+        return state
+
 
 def poll_into_sessions(
     adapter: VehicleSdkAdapter,
