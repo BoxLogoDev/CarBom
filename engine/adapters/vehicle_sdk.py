@@ -25,6 +25,7 @@ __all__ = [
     "VehicleSdkAdapter",
     "apply_raw",
     "apply_raws",
+    "apply_raws_for_sessions",
     "raw_from_snapshot",
     "raws_from_snapshots",
     "snapshot_from_raw",
@@ -124,6 +125,24 @@ def apply_raws(
     for raw in raws:
         state = apply_raw(session, raw)
     return state
+
+
+def apply_raws_for_sessions(
+    sessions: Iterable[CareSession],
+    raws: Iterable[Mapping[str, Any]],
+) -> tuple[SessionState, ...]:
+    """여러 세션에 같은 원시 신호 시퀀스를 적용하고 최종 상태들을 돌려준다.
+
+    apply_raws의 다중 세션 버전이다.
+    simulator.replay_scenarios와 짝을 이루는 SDK 쪽 편의 경로이다.
+    raws를 함수 시작 시 한 번만 tuple로 구체화한다.
+    그래서 제너레이터 raws도 모든 세션에 같은 시퀀스로 재사용된다.
+    sessions를 입력 순서대로 읽고 최종 상태들을 입력 순서대로 묶는다.
+    빈 sessions이면 빈 tuple을 돌려준다.
+    빈 raws이면 각 세션을 변경하지 않고 현재 상태들을 돌려준다.
+    """
+    materialized = tuple(raws)
+    return tuple(apply_raws(session, materialized) for session in sessions)
 
 
 class VehicleSdkAdapter:

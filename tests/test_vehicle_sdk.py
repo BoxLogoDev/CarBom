@@ -11,6 +11,9 @@ from engine.adapters import (
     VehicleSdkAdapter,
     apply_raw,
     apply_raws,
+    apply_raws_for_sessions,
+    dropoff_normal_snapshots,
+    forgotten_rising_temp_snapshots,
     raw_from_snapshot,
     raws_from_snapshots,
     snapshot_from_raw,
@@ -337,6 +340,69 @@ class ApplyRawTest(unittest.TestCase):
         generator_state = apply_raws(generator_session, iter(raws))
         self.assertEqual(generator_state, list_state)
         self.assertEqual(generator_session.state, list_session.state)
+
+
+class ApplyRawsForSessionsTest(unittest.TestCase):
+    def test_empty_sessions_gives_empty_tuple(self):
+        raws = raws_from_snapshots(dropoff_normal_snapshots())
+        self.assertEqual(apply_raws_for_sessions([], raws), ())
+
+    def test_empty_raws_leaves_sessions_unchanged(self):
+        sessions = [CareSession(), CareSession()]
+        states = apply_raws_for_sessions(sessions, [])
+        self.assertEqual(
+            states, (sessions[0].state, sessions[1].state)
+        )
+        for session in sessions:
+            self.assertEqual(session.state, SessionState.IDLE)
+            self.assertEqual(session.history, [])
+
+    def test_dropoff_normal_raws_complete_both_sessions(self):
+        raws = raws_from_snapshots(dropoff_normal_snapshots())
+        sessions = [CareSession(), CareSession()]
+        states = apply_raws_for_sessions(sessions, raws)
+        self.assertEqual(
+            states, (SessionState.COMPLETED, SessionState.COMPLETED)
+        )
+        self.assertEqual(
+            states, (sessions[0].state, sessions[1].state)
+        )
+
+    def test_forgotten_rising_temp_raws_exception_both_sessions(self):
+        raws = raws_from_snapshots(forgotten_rising_temp_snapshots())
+        sessions = [CareSession(), CareSession()]
+        states = apply_raws_for_sessions(sessions, raws)
+        self.assertEqual(
+            states, (SessionState.EXCEPTION, SessionState.EXCEPTION)
+        )
+        for session in sessions:
+            self.assertEqual(session.state, SessionState.EXCEPTION)
+            self.assertTrue(session.passenger_present)
+            self.assertEqual(session.current_snapshot.cabin_temp_c, 35.5)
+
+    def test_generator_raws_are_reused_for_all_sessions(self):
+        raws = raws_from_snapshots(dropoff_normal_snapshots())
+        sessions = [CareSession(), CareSession()]
+        states = apply_raws_for_sessions(sessions, iter(raws))
+        self.assertEqual(
+            states, (SessionState.COMPLETED, SessionState.COMPLETED)
+        )
+        for session in sessions:
+            self.assertEqual(session.state, SessionState.COMPLETED)
+
+    def test_generator_sessions_matches_list_input(self):
+        raws = raws_from_snapshots(dropoff_normal_snapshots())
+        list_sessions = [CareSession(), CareSession()]
+        generator_sessions = [CareSession(), CareSession()]
+        list_states = apply_raws_for_sessions(list_sessions, raws)
+        generator_states = apply_raws_for_sessions(
+            iter(generator_sessions), raws
+        )
+        self.assertEqual(generator_states, list_states)
+        self.assertEqual(
+            [session.state for session in generator_sessions],
+            [session.state for session in list_sessions],
+        )
 
 
 if __name__ == "__main__":
