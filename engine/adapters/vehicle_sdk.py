@@ -27,6 +27,7 @@ __all__ = [
     "apply_raws",
     "apply_raws_for_sessions",
     "poll_into_sessions",
+    "poll_repeatedly_into_sessions",
     "raw_from_snapshot",
     "raws_from_snapshots",
     "snapshot_from_raw",
@@ -231,3 +232,46 @@ def poll_into_sessions(
         return ()
     snapshot = adapter.poll()
     return tuple(session.apply_snapshot(snapshot) for session in materialized)
+
+
+def poll_repeatedly_into_sessions(
+    adapter: VehicleSdkAdapter,
+    sessions: Iterable[CareSession],
+    times: int,
+) -> tuple[SessionState, ...]:
+    """신호를 times번 읽어 그 시퀀스를 여러 세션 각각에 적용하고 상태들을 돌려준다.
+
+    VehicleSdkAdapter.poll_repeatedly_into의 다중 세션 버전이며
+    poll_into_sessions의 반복 버전이다.
+    apply_raws_for_sessions와 짝을 이루는 poll 쪽 다중 세션 반복 경로이다.
+    sessions를 먼저 tuple로 구체화한다.
+    세션이 비어 있거나 times가 0이면 poll()을 한 번도 호출하지 않고
+    각 세션의 현재 상태들을 입력 순서대로 돌려주므로, 클라이언트
+    미연결 어댑터에서도 예외가 나지 않는다(빈 sessions이면 빈 tuple).
+    비어 있지 않고 times가 양수이면 adapter.poll()을 정확히 times번만
+    호출해 스냅샷 시퀀스를 먼저 모두 모은 뒤, 그 시퀀스를 각 세션에
+    순서대로 적용한다. 따라서 모든 세션이 같은 스냅샷 시퀀스를 받고,
+    poll 횟수는 세션 수가 아니라 times와 같다.
+
+    Raises:
+        ValueError: times가 음수이면 낸다. 빈 sessions인 경우에도
+            이 검사가 먼저 적용되며, poll()을 호출하지 않고
+            어떤 세션도 변경하지 않는다.
+        NotImplementedError: SDK 클라이언트가 연결되지 않았고
+            times가 양수이며 sessions가 비어 있지 않으면 첫 poll()에서
+            낸다. 스냅샷을 모두 모은 뒤에 적용하므로 어떤 세션도
+            변경되지 않는다.
+    """
+    if times < 0:
+        raise ValueError(f"times는 0 이상이어야 한다: {times}")
+    materialized = tuple(sessions)
+    if not materialized or times == 0:
+        return tuple(session.state for session in materialized)
+    snapshots = tuple(adapter.poll() for _ in range(times))
+    states: list[SessionState] = []
+    for session in materialized:
+        state = session.state
+        for snapshot in snapshots:
+            state = session.apply_snapshot(snapshot)
+        states.append(state)
+    return tuple(states)

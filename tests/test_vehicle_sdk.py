@@ -15,6 +15,7 @@ from engine.adapters import (
     dropoff_normal_snapshots,
     forgotten_rising_temp_snapshots,
     poll_into_sessions,
+    poll_repeatedly_into_sessions,
     raw_from_snapshot,
     raws_from_snapshots,
     snapshot_from_raw,
@@ -529,6 +530,74 @@ class PollRepeatedlyIntoTest(unittest.TestCase):
         self.assertEqual(state, SessionState.ONBOARD)
         self.assertEqual(session.state, SessionState.ONBOARD)
         self.assertEqual(client.calls, 2)
+
+
+class PollRepeatedlyIntoSessionsTest(unittest.TestCase):
+    def test_empty_sessions_never_polls_even_without_client(self):
+        self.assertEqual(
+            poll_repeatedly_into_sessions(VehicleSdkAdapter(), [], 3), ()
+        )
+        with self.assertRaises(ValueError):
+            poll_repeatedly_into_sessions(VehicleSdkAdapter(), [], -1)
+
+    def test_zero_times_returns_current_states_without_polling(self):
+        sessions = [CareSession(), CareSession()]
+        states = poll_repeatedly_into_sessions(
+            VehicleSdkAdapter(), sessions, 0
+        )
+        self.assertEqual(states, (SessionState.IDLE, SessionState.IDLE))
+        self.assertEqual(states, (sessions[0].state, sessions[1].state))
+        for session in sessions:
+            self.assertEqual(session.history, [])
+
+    def test_negative_times_raises_value_error_without_polling(self):
+        raws = raws_from_snapshots(scenario_snapshots("dropoff_normal"))
+        client = FakeSequenceSdkClient(raws)
+        session = CareSession()
+        with self.assertRaises(ValueError):
+            poll_repeatedly_into_sessions(
+                VehicleSdkAdapter(client), [session], -1
+            )
+        self.assertEqual(client.calls, 0)
+        self.assertEqual(session.state, SessionState.IDLE)
+        self.assertEqual(session.history, [])
+
+    def test_repeated_polls_complete_both_sessions_from_generator(self):
+        raws = raws_from_snapshots(scenario_snapshots("dropoff_normal"))
+        client = FakeSequenceSdkClient(raws)
+        sessions = [CareSession(), CareSession()]
+        states = poll_repeatedly_into_sessions(
+            VehicleSdkAdapter(client), iter(sessions), 6
+        )
+        self.assertEqual(
+            states, (SessionState.COMPLETED, SessionState.COMPLETED)
+        )
+        self.assertEqual(states, (sessions[0].state, sessions[1].state))
+        self.assertEqual(client.calls, 6)
+
+    def test_repeated_polls_exception_both_sessions(self):
+        raws = raws_from_snapshots(
+            scenario_snapshots("forgotten_rising_temp")
+        )
+        client = FakeSequenceSdkClient(raws)
+        sessions = [CareSession(), CareSession()]
+        states = poll_repeatedly_into_sessions(
+            VehicleSdkAdapter(client), sessions, 8
+        )
+        self.assertEqual(
+            states, (SessionState.EXCEPTION, SessionState.EXCEPTION)
+        )
+        self.assertEqual(client.calls, 8)
+        for session in sessions:
+            self.assertTrue(session.passenger_present)
+            self.assertEqual(session.current_snapshot.cabin_temp_c, 35.5)
+
+    def test_without_client_fails_and_leaves_session_unchanged(self):
+        session = CareSession()
+        with self.assertRaises(NotImplementedError):
+            poll_repeatedly_into_sessions(VehicleSdkAdapter(), [session], 3)
+        self.assertEqual(session.state, SessionState.IDLE)
+        self.assertEqual(session.history, [])
 
 
 if __name__ == "__main__":
