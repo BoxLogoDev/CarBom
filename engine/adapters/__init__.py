@@ -7,6 +7,7 @@ from engine.adapters.simulator import (
     pet_dropoff_snapshots,
     replay,
     replay_scenario,
+    replay_scenarios,
     scenario_snapshots,
     snapshots_for_scenarios,
 )
@@ -31,6 +32,7 @@ __all__ = [
     "raws_from_snapshots",
     "replay",
     "replay_scenario",
+    "replay_scenarios",
     "raw_from_snapshot",
     "scenario_snapshots",
     "snapshot_from_raw",

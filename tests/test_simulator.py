@@ -10,6 +10,7 @@ from engine.adapters import (
     pet_dropoff_snapshots,
     replay,
     replay_scenario,
+    replay_scenarios,
     scenario_snapshots,
     snapshots_for_scenarios,
 )
@@ -183,6 +184,63 @@ class SnapshotsForScenariosTest(unittest.TestCase):
     def test_unknown_name_raises(self):
         with self.assertRaises(ValueError):
             snapshots_for_scenarios(["dropoff_normal", "unknown_scenario"])
+
+
+class ReplayScenariosTest(unittest.TestCase):
+    def test_empty_input_returns_empty_tuple(self):
+        self.assertEqual(replay_scenarios([], "dropoff_normal"), ())
+
+    def test_dropoff_normal_replays_to_completed_for_each_session(self):
+        sessions = [CareSession(), CareSession()]
+
+        result = replay_scenarios(sessions, "dropoff_normal")
+
+        self.assertEqual(
+            result, (SessionState.COMPLETED, SessionState.COMPLETED)
+        )
+        for state, session in zip(result, sessions):
+            self.assertEqual(state, session.state)
+
+    def test_forgotten_rising_temp_replays_to_exception(self):
+        session = CareSession()
+
+        result = replay_scenarios([session], "forgotten_rising_temp")
+
+        self.assertEqual(result, (SessionState.EXCEPTION,))
+        self.assertTrue(session.passenger_present)
+
+    def test_pet_dropoff_start_shifts_first_transition(self):
+        session = CareSession()
+
+        result = replay_scenarios([session], "pet_dropoff", start=1000.0)
+
+        self.assertEqual(result, (SessionState.COMPLETED,))
+        self.assertEqual(session.history[0].timestamp, 1000.0)
+
+    def test_generator_input_matches_list_input(self):
+        list_sessions = [CareSession(), CareSession()]
+        generator_sessions = [CareSession(), CareSession()]
+
+        list_result = replay_scenarios(list_sessions, "dropoff_normal")
+        generator_result = replay_scenarios(
+            (session for session in generator_sessions), "dropoff_normal"
+        )
+
+        self.assertEqual(generator_result, list_result)
+        self.assertEqual(
+            [session.state for session in generator_sessions],
+            [session.state for session in list_sessions],
+        )
+
+    def test_unknown_name_raises_and_leaves_sessions_untouched(self):
+        sessions = [CareSession(), CareSession()]
+
+        with self.assertRaises(ValueError):
+            replay_scenarios(sessions, "unknown_scenario")
+
+        for session in sessions:
+            self.assertEqual(session.state, SessionState.IDLE)
+            self.assertEqual(session.history, [])
 
 
 if __name__ == "__main__":

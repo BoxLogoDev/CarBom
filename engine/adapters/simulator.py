@@ -26,6 +26,7 @@ __all__ = [
     "pet_dropoff_snapshots",
     "replay",
     "replay_scenario",
+    "replay_scenarios",
     "scenario_snapshots",
     "snapshots_for_scenarios",
 ]
@@ -179,3 +180,19 @@ def replay_scenario(
             조회가 먼저 실패하므로 세션은 변경되지 않는다.
     """
     return replay(session, scenario_snapshots(name, start))
+
+
+def replay_scenarios(
+    sessions: Iterable[CareSession], name: str, start: float = 0.0
+) -> tuple[SessionState, ...]:
+    """여러 세션에 같은 시나리오를 재생하고 최종 상태들을 돌려준다.
+
+    sessions를 입력 순서대로 읽어 각 세션에 scenario_snapshots(name, start)를
+    재생하고 최종 상태들을 tuple로 묶는다. 빈 입력이면 빈 tuple이다.
+
+    Raises:
+        ValueError: 알 수 없는 시나리오 이름이면 낸다.
+            조회가 먼저 실패하므로 어떤 세션도 변경되지 않는다.
+    """
+    snapshots = scenario_snapshots(name, start)
+    return tuple(replay(session, snapshots) for session in sessions)
