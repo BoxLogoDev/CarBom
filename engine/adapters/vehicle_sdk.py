@@ -26,6 +26,7 @@ __all__ = [
     "apply_raw",
     "apply_raws",
     "apply_raws_for_sessions",
+    "poll_into_sessions",
     "raw_from_snapshot",
     "raws_from_snapshots",
     "snapshot_from_raw",
@@ -183,3 +184,24 @@ class VehicleSdkAdapter:
                 이때 poll()이 먼저 실패하므로 세션은 변경되지 않는다.
         """
         return session.apply_snapshot(self.poll())
+
+
+def poll_into_sessions(
+    adapter: VehicleSdkAdapter,
+    sessions: Iterable[CareSession],
+) -> tuple[SessionState, ...]:
+    """신호를 한 번 읽어 여러 세션에 같은 스냅샷을 적용하고 상태들을 돌려준다.
+
+    VehicleSdkAdapter.poll_into의 다중 세션 버전이다.
+    sessions를 먼저 tuple로 구체화한다.
+    빈 sessions이면 poll()을 호출하지 않고 빈 tuple을 돌려준다.
+    비어 있지 않으면 adapter.poll()을 정확히 1회만 호출해 스냅샷 1건을
+    얻고, 그 스냅샷을 각 세션에 입력 순서대로 적용한다.
+    미연결 어댑터이면 poll()의 NotImplementedError가 먼저 전파되므로
+    어떤 세션도 변경되지 않는다.
+    """
+    materialized = tuple(sessions)
+    if not materialized:
+        return ()
+    snapshot = adapter.poll()
+    return tuple(session.apply_snapshot(snapshot) for session in materialized)

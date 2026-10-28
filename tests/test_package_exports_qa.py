@@ -59,6 +59,7 @@ ADAPTER_SOURCES = {
     "apply_raw": vehicle_sdk,
     "apply_raws": vehicle_sdk,
     "apply_raws_for_sessions": vehicle_sdk,
+    "poll_into_sessions": vehicle_sdk,
     "raw_from_snapshot": vehicle_sdk,
     "raws_from_snapshots": vehicle_sdk,
     "snapshot_from_raw": vehicle_sdk,

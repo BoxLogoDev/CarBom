@@ -14,6 +14,7 @@ from engine.adapters import (
     apply_raws_for_sessions,
     dropoff_normal_snapshots,
     forgotten_rising_temp_snapshots,
+    poll_into_sessions,
     raw_from_snapshot,
     raws_from_snapshots,
     snapshot_from_raw,
@@ -403,6 +404,74 @@ class ApplyRawsForSessionsTest(unittest.TestCase):
             [session.state for session in generator_sessions],
             [session.state for session in list_sessions],
         )
+
+
+class PollIntoSessionsTest(unittest.TestCase):
+    def test_empty_sessions_never_polls_even_without_client(self):
+        self.assertEqual(poll_into_sessions(VehicleSdkAdapter(), []), ())
+
+    def test_single_poll_applies_same_snapshot_to_both_sessions(self):
+        client = FakeSdkClient({"rear_door_open": True})
+        adapter = VehicleSdkAdapter(client)
+        sessions = [CareSession(), CareSession()]
+        states = poll_into_sessions(adapter, sessions)
+        self.assertEqual(
+            states, (SessionState.BOARDING, SessionState.BOARDING)
+        )
+        self.assertEqual(states, (sessions[0].state, sessions[1].state))
+        self.assertEqual(client.calls, 1)
+
+    def test_locked_poll_moves_both_prepared_sessions_to_exception(self):
+        sessions = [CareSession(), CareSession()]
+        for session in sessions:
+            session.apply_snapshot(
+                snapshot_from_raw({"rear_door_open": True})
+            )
+            session.apply_snapshot(
+                snapshot_from_raw({"rear_seat_belt_buckled": True})
+            )
+        adapter = VehicleSdkAdapter(
+            FakeSdkClient({"rear_seat_belt_buckled": True, "locked": True})
+        )
+        states = poll_into_sessions(adapter, sessions)
+        self.assertEqual(
+            states, (SessionState.EXCEPTION, SessionState.EXCEPTION)
+        )
+        for session in sessions:
+            self.assertTrue(session.passenger_present)
+
+    def test_without_client_fails_and_leaves_session_unchanged(self):
+        session = CareSession()
+        with self.assertRaises(NotImplementedError):
+            poll_into_sessions(VehicleSdkAdapter(), [session])
+        self.assertEqual(session.state, SessionState.IDLE)
+        self.assertEqual(session.history, [])
+
+    def test_generator_sessions_matches_list_input(self):
+        list_sessions = [CareSession(), CareSession()]
+        generator_sessions = [CareSession(), CareSession()]
+        list_states = poll_into_sessions(
+            VehicleSdkAdapter(FakeSdkClient({"rear_door_open": True})),
+            list_sessions,
+        )
+        generator_states = poll_into_sessions(
+            VehicleSdkAdapter(FakeSdkClient({"rear_door_open": True})),
+            iter(generator_sessions),
+        )
+        self.assertEqual(generator_states, list_states)
+        self.assertEqual(
+            [session.state for session in generator_sessions],
+            [session.state for session in list_sessions],
+        )
+
+    def test_polled_snapshot_temp_is_reflected_in_each_session(self):
+        sessions = [CareSession(), CareSession()]
+        adapter = VehicleSdkAdapter(
+            FakeSdkClient({"cabin_temp_c": 35.5})
+        )
+        poll_into_sessions(adapter, sessions)
+        for session in sessions:
+            self.assertEqual(session.current_snapshot.cabin_temp_c, 35.5)
 
 
 if __name__ == "__main__":
