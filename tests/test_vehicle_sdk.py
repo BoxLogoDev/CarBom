@@ -16,6 +16,7 @@ from engine.adapters import (
     forgotten_rising_temp_snapshots,
     poll_into_sessions,
     poll_repeatedly_into_sessions,
+    poll_snapshots,
     raw_from_snapshot,
     raws_from_snapshots,
     snapshot_from_raw,
@@ -598,6 +599,55 @@ class PollRepeatedlyIntoSessionsTest(unittest.TestCase):
             poll_repeatedly_into_sessions(VehicleSdkAdapter(), [session], 3)
         self.assertEqual(session.state, SessionState.IDLE)
         self.assertEqual(session.history, [])
+
+
+class PollSnapshotsTest(unittest.TestCase):
+    def test_zero_times_returns_empty_tuple_without_client(self):
+        self.assertEqual(poll_snapshots(VehicleSdkAdapter(), 0), ())
+
+    def test_negative_times_raises_value_error_without_polling(self):
+        raws = raws_from_snapshots(scenario_snapshots("dropoff_normal"))
+        client = FakeSequenceSdkClient(raws)
+        with self.assertRaises(ValueError):
+            poll_snapshots(VehicleSdkAdapter(client), -1)
+        self.assertEqual(client.calls, 0)
+        with self.assertRaises(ValueError):
+            poll_snapshots(VehicleSdkAdapter(), -1)
+
+    def test_polls_normal_flow_snapshots_in_order(self):
+        raws = raws_from_snapshots(scenario_snapshots("dropoff_normal"))
+        client = FakeSequenceSdkClient(raws)
+        snapshots = poll_snapshots(VehicleSdkAdapter(client), 6)
+        self.assertEqual(client.calls, 6)
+        self.assertEqual(snapshots, dropoff_normal_snapshots())
+        self.assertEqual(snapshots[0].rear_door, DoorState.OPEN)
+        self.assertEqual(snapshots[-1].timestamp, 300.0)
+
+    def test_polls_exception_flow_last_snapshot_is_hot_and_locked(self):
+        raws = raws_from_snapshots(
+            scenario_snapshots("forgotten_rising_temp")
+        )
+        client = FakeSequenceSdkClient(raws)
+        snapshots = poll_snapshots(VehicleSdkAdapter(client), 8)
+        self.assertEqual(client.calls, 8)
+        self.assertEqual(snapshots, forgotten_rising_temp_snapshots())
+        self.assertEqual(snapshots[-1].cabin_temp_c, 35.5)
+        self.assertEqual(snapshots[-1].lock, LockState.LOCKED)
+        self.assertTrue(snapshots[-1].rear_seat_belt_buckled)
+
+    def test_without_client_positive_times_fails(self):
+        with self.assertRaises(NotImplementedError):
+            poll_snapshots(VehicleSdkAdapter(), 3)
+
+    def test_returns_tuple_of_signal_snapshots(self):
+        raws = raws_from_snapshots(scenario_snapshots("pet_dropoff"))
+        snapshots = poll_snapshots(
+            VehicleSdkAdapter(FakeSequenceSdkClient(raws)), 6
+        )
+        self.assertIsInstance(snapshots, tuple)
+        self.assertEqual(len(snapshots), 6)
+        for snapshot in snapshots:
+            self.assertIsInstance(snapshot, SignalSnapshot)
 
 
 if __name__ == "__main__":

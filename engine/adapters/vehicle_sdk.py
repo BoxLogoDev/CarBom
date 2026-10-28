@@ -28,6 +28,7 @@ __all__ = [
     "apply_raws_for_sessions",
     "poll_into_sessions",
     "poll_repeatedly_into_sessions",
+    "poll_snapshots",
     "raw_from_snapshot",
     "raws_from_snapshots",
     "snapshot_from_raw",
@@ -275,3 +276,26 @@ def poll_repeatedly_into_sessions(
             state = session.apply_snapshot(snapshot)
         states.append(state)
     return tuple(states)
+
+
+def poll_snapshots(
+    adapter: VehicleSdkAdapter, times: int
+) -> tuple[SignalSnapshot, ...]:
+    """신호를 times번 읽어 스냅샷 시퀀스만 돌려준다(세션에 적용하지 않는다).
+
+    poll_repeatedly_into·poll_repeatedly_into_sessions가 내부에서 먼저
+    모으는 스냅샷 시퀀스를 읽기 전용으로 분리한 헬퍼이다.
+    adapter.poll()을 정확히 times번 호출하고, 얻은 스냅샷들을 호출
+    순서 그대로 tuple로 묶는다.
+    times가 0이면 poll()을 한 번도 호출하지 않고 빈 tuple을 돌려주므로,
+    클라이언트 미연결 어댑터에서도 예외가 나지 않는다.
+
+    Raises:
+        ValueError: times가 음수이면 낸다. 이 검사가 먼저 적용되므로
+            poll()을 호출하지 않는다.
+        NotImplementedError: SDK 클라이언트가 연결되지 않았고
+            times가 양수이면 첫 poll()에서 낸다.
+    """
+    if times < 0:
+        raise ValueError(f"times는 0 이상이어야 한다: {times}")
+    return tuple(adapter.poll() for _ in range(times))
