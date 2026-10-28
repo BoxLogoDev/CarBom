@@ -11,6 +11,7 @@ from engine.adapters import (
     replay,
     replay_scenario,
     scenario_snapshots,
+    snapshots_for_scenarios,
 )
 
 
@@ -146,6 +147,42 @@ class ReplayScenarioTest(unittest.TestCase):
 
         self.assertEqual(session.state, SessionState.IDLE)
         self.assertEqual(session.history, [])
+
+
+class SnapshotsForScenariosTest(unittest.TestCase):
+    def test_empty_input_returns_empty_tuple(self):
+        self.assertEqual(snapshots_for_scenarios([]), ())
+
+    def test_preserves_order_and_matches_individual_calls(self):
+        result = snapshots_for_scenarios(SCENARIO_NAMES)
+
+        self.assertEqual(len(result), len(SCENARIO_NAMES))
+        for name, snapshots in zip(SCENARIO_NAMES, result):
+            self.assertEqual(snapshots, scenario_snapshots(name))
+
+    def test_start_propagates_to_every_scenario(self):
+        result = snapshots_for_scenarios(SCENARIO_NAMES, start=1000.0)
+
+        for snapshots in result:
+            self.assertEqual(snapshots[0].timestamp, 1000.0)
+
+    def test_generator_input_matches_list_input(self):
+        self.assertEqual(
+            snapshots_for_scenarios(name for name in SCENARIO_NAMES),
+            snapshots_for_scenarios(list(SCENARIO_NAMES)),
+        )
+
+    def test_duplicate_names_are_kept(self):
+        result = snapshots_for_scenarios(
+            ["dropoff_normal", "dropoff_normal"]
+        )
+
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0], result[1])
+
+    def test_unknown_name_raises(self):
+        with self.assertRaises(ValueError):
+            snapshots_for_scenarios(["dropoff_normal", "unknown_scenario"])
 
 
 if __name__ == "__main__":

@@ -27,6 +27,7 @@ __all__ = [
     "replay",
     "replay_scenario",
     "scenario_snapshots",
+    "snapshots_for_scenarios",
 ]
 
 
@@ -137,6 +138,22 @@ def scenario_snapshots(
     if name == "pet_dropoff":
         return pet_dropoff_snapshots(start)
     raise ValueError(f"알 수 없는 시나리오 이름이다: {name}")
+
+
+def snapshots_for_scenarios(
+    names: Iterable[str], start: float = 0.0
+) -> tuple[tuple[SignalSnapshot, ...], ...]:
+    """여러 시나리오의 스냅샷 시퀀스를 입력 순서대로 돌려준다.
+
+    names의 각 이름에 scenario_snapshots(name, start)를 적용한 결과들을
+    하나의 tuple로 묶는다. start는 모든 시나리오에 동일하게 전달된다.
+    빈 입력이면 빈 tuple을 돌려준다. 중복 이름은 중복 그대로 유지한다.
+
+    Raises:
+        ValueError: 알 수 없는 시나리오 이름이 있으면 낸다.
+            부분 결과는 돌려주지 않는다.
+    """
+    return tuple(scenario_snapshots(name, start) for name in names)
 
 
 def replay(
