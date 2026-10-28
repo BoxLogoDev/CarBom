@@ -10,7 +10,7 @@
 벨트가 풀린 상태에서 뒷문이 열리면 동승자가 내렸다고 본다.
 
 핵심 예외 규칙은 한 줄이다.
-시동이 꺼졌고 차량이 잠겼고 동승자가 남아 있으면 EXCEPTION 이다.
+시동이 꺼졌고 차량이 잠겼고 뒷문이 닫혔고 동승자가 남아 있으면 EXCEPTION 이다.
 """
 
 from __future__ import annotations
@@ -233,5 +233,6 @@ class CareSession:
         return (
             not snapshot.ignition_on
             and snapshot.locked
+            and not snapshot.rear_door_open
             and self._passenger_present
         )
