@@ -9,6 +9,7 @@ from engine import (
     needs_manual_confirmations,
     needs_manual_confirmations_by_belt,
     needs_manual_confirmations_for_kinds,
+    needs_manual_confirmations_for_kinds_by_belt,
     profile_for,
     profiles_for,
 )
@@ -281,6 +282,84 @@ class NeedsManualConfirmationsByBeltTest(unittest.TestCase):
         )
         self.assertIsInstance(result, tuple)
         for value in result:
+            self.assertIsInstance(value, bool)
+
+
+class NeedsManualConfirmationsForKindsByBeltTest(unittest.TestCase):
+    def test_empty_input_returns_empty_tuple(self):
+        self.assertEqual(
+            needs_manual_confirmations_for_kinds_by_belt([], []), ()
+        )
+
+    def test_mixed_pairing_matches_combination(self):
+        kinds = [
+            PassengerKind.PET,
+            PassengerKind.CHILD,
+            PassengerKind.PET,
+            PassengerKind.ELDER,
+        ]
+        belt_flags = [False, False, True, False]
+        result = needs_manual_confirmations_for_kinds_by_belt(
+            kinds, belt_flags
+        )
+        self.assertEqual(result, (True, False, False, False))
+        self.assertEqual(
+            result,
+            tuple(
+                needs_manual_confirmation(
+                    profile_for(kind), belt_buckled=flag
+                )
+                for kind, flag in zip(kinds, belt_flags)
+            ),
+        )
+
+    def test_length_mismatch_raises_value_error_both_ways(self):
+        with self.assertRaises(ValueError):
+            needs_manual_confirmations_for_kinds_by_belt(
+                [PassengerKind.PET], [True, False]
+            )
+        with self.assertRaises(ValueError):
+            needs_manual_confirmations_for_kinds_by_belt(
+                [PassengerKind.PET, PassengerKind.PET], [True]
+            )
+
+    def test_string_none_and_unknown_kinds_fall_back(self):
+        kinds = ["pet", " PET ", None, "unknown", "child"]
+        belt_flags = [False, True, False, False, False]
+        result = needs_manual_confirmations_for_kinds_by_belt(
+            kinds, belt_flags
+        )
+        self.assertEqual(result, (True, False, False, False, False))
+
+    def test_all_kinds_with_uniform_flags(self):
+        kinds = [kind for kind in PassengerKind]
+        self.assertEqual(
+            needs_manual_confirmations_for_kinds_by_belt(
+                kinds, [True, True, True, True]
+            ),
+            (False, False, False, False),
+        )
+        self.assertEqual(
+            needs_manual_confirmations_for_kinds_by_belt(
+                kinds, [False, False, False, False]
+            ),
+            (False, True, False, False),
+        )
+
+    def test_generator_inputs_match_list_keep_duplicates_and_types(self):
+        kinds = [PassengerKind.PET, PassengerKind.PET, "pet"]
+        belt_flags = [False, True, False]
+        from_list = needs_manual_confirmations_for_kinds_by_belt(
+            kinds, belt_flags
+        )
+        from_generator = needs_manual_confirmations_for_kinds_by_belt(
+            (kind for kind in kinds),
+            (flag for flag in belt_flags),
+        )
+        self.assertEqual(from_generator, from_list)
+        self.assertEqual(from_generator, (True, False, True))
+        self.assertIsInstance(from_generator, tuple)
+        for value in from_generator:
             self.assertIsInstance(value, bool)
 
 

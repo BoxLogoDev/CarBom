@@ -17,6 +17,7 @@ from engine.profiles import (
     needs_manual_confirmations,
     needs_manual_confirmations_by_belt,
     needs_manual_confirmations_for_kinds,
+    needs_manual_confirmations_for_kinds_by_belt,
     profile_for,
     profiles_for,
 )
@@ -62,6 +63,7 @@ __all__ = [
     "needs_manual_confirmations",
     "needs_manual_confirmations_by_belt",
     "needs_manual_confirmations_for_kinds",
+    "needs_manual_confirmations_for_kinds_by_belt",
     "profile_for",
     "profiles_for",
     "report_for_session",
