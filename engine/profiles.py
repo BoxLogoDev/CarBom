@@ -7,6 +7,7 @@
 그 밖의 종류는 벨트 미체결이어도 수동 확인을 요구하지 않는다.
 대량 헬퍼 profiles_for는 종류들을 순서대로 읽어 프로필 tuple을 돌려준다.
 알 수 없는 값은 profile_for와 같이 성인 프로필로 처리한다.
+대량 판정 헬퍼 needs_manual_confirmations는 프로필들을 순서대로 읽어 수동 확인 필요 여부 tuple을 돌려준다.
 """
 
 from __future__ import annotations
@@ -129,11 +130,26 @@ def needs_manual_confirmation(
     return profile.requires_manual_confirmation_when_unbelted
 
 
+def needs_manual_confirmations(
+    profiles: Iterable[PassengerProfile], belt_buckled: bool
+) -> tuple[bool, ...]:
+    """프로필들을 순서대로 읽어 수동 탑승 확인이 필요한지 돌려준다.
+
+    needs_manual_confirmation의 대량 판정이다.
+    입력 순서를 그대로 유지하고, 빈 입력이면 빈 tuple을 돌려준다.
+    """
+    return tuple(
+        needs_manual_confirmation(profile, belt_buckled=belt_buckled)
+        for profile in profiles
+    )
+
+
 __all__ = [
     "PassengerKind",
     "PassengerProfile",
     "all_profiles",
     "needs_manual_confirmation",
+    "needs_manual_confirmations",
     "profile_for",
     "profiles_for",
 ]
