@@ -11,6 +11,7 @@ from engine.adapters.simulator import (
     replay_scenarios_by_name,
     scenario_snapshots,
     snapshots_for_scenarios,
+    snapshots_for_scenarios_by_start,
 )
 from engine.adapters.vehicle_sdk import (
     VehicleSdkAdapter,
@@ -49,5 +50,6 @@ __all__ = [
     "scenario_snapshots",
     "snapshot_from_raw",
     "snapshots_for_scenarios",
+    "snapshots_for_scenarios_by_start",
     "snapshots_from_raws",
 ]

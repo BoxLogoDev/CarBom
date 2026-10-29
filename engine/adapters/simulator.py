@@ -30,6 +30,7 @@ __all__ = [
     "replay_scenarios_by_name",
     "scenario_snapshots",
     "snapshots_for_scenarios",
+    "snapshots_for_scenarios_by_start",
 ]
 
 
@@ -156,6 +157,36 @@ def snapshots_for_scenarios(
             부분 결과는 돌려주지 않는다.
     """
     return tuple(scenario_snapshots(name, start) for name in names)
+
+
+def snapshots_for_scenarios_by_start(
+    names: Iterable[str], starts: Iterable[float]
+) -> tuple[tuple[SignalSnapshot, ...], ...]:
+    """여러 시나리오의 스냅샷 시퀀스를 시나리오마다 다른 시작 시각으로 돌려준다.
+
+    names와 starts를 입력 순서대로 짝지어, 각 이름에 대응하는 시작 시각으로
+    scenario_snapshots(name, start)를 적용한 결과들을 하나의 tuple로 묶는다.
+    빈 입력(둘 다 빈 경우)이면 빈 tuple이다. 중복은 중복 그대로 유지한다.
+    snapshots_for_scenarios(같은 start를 모든 시나리오에 전달)와 짝을 이루는,
+    시나리오마다 다른 시작 시각을 전달하는 경로다.
+
+    Raises:
+        ValueError: names와 starts의 길이가 다르면 낸다.
+            부분 결과는 돌려주지 않는다.
+        ValueError: 알 수 없는 시나리오 이름이 있으면 낸다.
+            부분 결과는 돌려주지 않는다.
+    """
+    names_tuple = tuple(names)
+    starts_tuple = tuple(starts)
+    if len(names_tuple) != len(starts_tuple):
+        raise ValueError(
+            "시나리오 이름 수와 시작 시각 수가 다릅니다: "
+            f"{len(names_tuple)} != {len(starts_tuple)}"
+        )
+    return tuple(
+        scenario_snapshots(name, start)
+        for name, start in zip(names_tuple, starts_tuple)
+    )
 
 
 def replay(

@@ -14,6 +14,7 @@ from engine.adapters import (
     replay_scenarios_by_name,
     scenario_snapshots,
     snapshots_for_scenarios,
+    snapshots_for_scenarios_by_start,
 )
 
 
@@ -185,6 +186,50 @@ class SnapshotsForScenariosTest(unittest.TestCase):
     def test_unknown_name_raises(self):
         with self.assertRaises(ValueError):
             snapshots_for_scenarios(["dropoff_normal", "unknown_scenario"])
+
+
+class SnapshotsForScenariosByStartTest(unittest.TestCase):
+    def test_empty_input_returns_empty_tuple(self):
+        self.assertEqual(snapshots_for_scenarios_by_start([], []), ())
+
+    def test_paired_starts_match_individual_calls(self):
+        starts = (0.0, 1000.0, 2000.0)
+
+        result = snapshots_for_scenarios_by_start(SCENARIO_NAMES, starts)
+
+        self.assertEqual(len(result), len(SCENARIO_NAMES))
+        for name, start, snapshots in zip(SCENARIO_NAMES, starts, result):
+            self.assertEqual(snapshots, scenario_snapshots(name, start))
+            self.assertEqual(snapshots[0].timestamp, start)
+
+    def test_length_mismatch_raises_both_ways(self):
+        with self.assertRaises(ValueError):
+            snapshots_for_scenarios_by_start(SCENARIO_NAMES, [0.0, 1000.0])
+        with self.assertRaises(ValueError):
+            snapshots_for_scenarios_by_start(["dropoff_normal"], [0.0, 1000.0])
+
+    def test_unknown_name_raises(self):
+        with self.assertRaises(ValueError):
+            snapshots_for_scenarios_by_start(
+                ["dropoff_normal", "unknown_scenario"], [0.0, 1000.0]
+            )
+
+    def test_generator_input_and_duplicates(self):
+        result = snapshots_for_scenarios_by_start(
+            (name for name in ["pet_dropoff", "pet_dropoff"]),
+            (start for start in [500.0, 500.0]),
+        )
+
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0], result[1])
+        self.assertEqual(result[0][0].timestamp, 500.0)
+
+    def test_returns_tuple_of_tuples(self):
+        result = snapshots_for_scenarios_by_start(SCENARIO_NAMES, [0.0, 1.0, 2.0])
+
+        self.assertIsInstance(result, tuple)
+        for snapshots in result:
+            self.assertIsInstance(snapshots, tuple)
 
 
 class ReplayScenariosTest(unittest.TestCase):
