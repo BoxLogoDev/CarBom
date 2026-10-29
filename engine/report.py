@@ -11,6 +11,7 @@
 리포트는 그 집계에서 빼고, 대상이 하나도 없으면 None 이다.
 대량 헬퍼는 세션들을 입력 순서대로 읽어 리포트들을 돌려주며,
 세션을 바꾸지 않는다.
+누적함의 대량 추가는 리포트들을 입력 순서대로 누적하고 돌려준다.
 """
 
 from __future__ import annotations
@@ -126,6 +127,21 @@ class CareReportLog:
     def add_report(self, report: CareReport) -> None:
         """리포트 한 건을 누적한다."""
         self._reports.append(report)
+
+    def add_reports(
+        self, reports: Iterable[CareReport]
+    ) -> tuple[CareReport, ...]:
+        """리포트들을 순서대로 누적하고 추가된 리포트들을 돌려준다.
+
+        add_report의 대량 적용이다.
+        입력 순서를 그대로 유지하고, 빈 입력이면 빈 tuple을 돌려주며
+        누적함은 변하지 않는다. 중복 리포트는 제거하지 않고 그대로
+        누적한다.
+        """
+        added = tuple(reports)
+        for report in added:
+            self.add_report(report)
+        return added
 
     def add_session(self, session: CareSession) -> CareReport:
         """세션 리포트를 만들어 누적하고 돌려준다."""

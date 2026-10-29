@@ -440,5 +440,102 @@ class ReportsForSessionsTest(unittest.TestCase):
         self.assertEqual(log.reports, reports_before)
 
 
+class AddReportsTest(unittest.TestCase):
+    def test_empty_input_returns_empty_tuple_and_leaves_log_empty(self):
+        log = CareReportLog()
+
+        returned = log.add_reports([])
+
+        self.assertEqual(returned, ())
+        self.assertEqual(len(log), 0)
+        self.assertEqual(log.reports, ())
+
+    def test_add_reports_preserves_order_and_object_identity(self):
+        completed = CareSession()
+        complete_normally(completed, start=1000.0)
+        exception = CareSession()
+        drive_to_exception(exception, start=2000.0)
+        first = report_for_session(completed)
+        second = report_for_session(exception)
+        log = CareReportLog()
+
+        returned = log.add_reports([first, second])
+
+        self.assertIsInstance(returned, tuple)
+        self.assertEqual(returned, (first, second))
+        self.assertIs(returned[0], first)
+        self.assertIs(returned[1], second)
+        self.assertEqual(log.reports, (first, second))
+
+    def test_add_reports_accumulates_and_updates_aggregates(self):
+        completed = CareSession()
+        complete_normally(completed, start=1000.0)
+        exception = CareSession()
+        drive_to_exception(exception, start=2000.0)
+        exception_report = report_for_session(exception)
+        log = CareReportLog()
+
+        log.add_reports([report_for_session(completed), exception_report])
+
+        self.assertEqual(len(log), 2)
+        self.assertEqual(log.completed_count, 1)
+        self.assertEqual(log.sessions_with_exception, 1)
+        self.assertEqual(
+            log.total_exception_count, exception_report.exception_count
+        )
+
+    def test_add_reports_accepts_generator_input(self):
+        completed = CareSession()
+        complete_normally(completed, start=1000.0)
+        report = report_for_session(completed)
+        list_log = CareReportLog()
+        generator_log = CareReportLog()
+
+        list_log.add_reports([report])
+        returned = generator_log.add_reports(r for r in [report])
+
+        self.assertEqual(returned, (report,))
+        self.assertEqual(generator_log.reports, list_log.reports)
+
+    def test_add_reports_empty_input_leaves_nonempty_log_unchanged(self):
+        log = CareReportLog()
+        log.add_session(CareSession())
+        reports_before = log.reports
+
+        returned = log.add_reports([])
+
+        self.assertEqual(returned, ())
+        self.assertEqual(len(log), 1)
+        self.assertEqual(log.reports, reports_before)
+
+    def test_add_reports_matches_add_sessions_result(self):
+        completed = CareSession()
+        complete_normally(completed, start=1000.0)
+        exception = CareSession()
+        drive_to_exception(exception, start=2000.0)
+        via_reports = CareReportLog()
+        via_sessions = CareReportLog()
+
+        returned = via_reports.add_reports(
+            reports_for_sessions([completed, exception])
+        )
+        via_sessions.add_sessions([completed, exception])
+
+        self.assertEqual(returned, via_sessions.reports)
+        self.assertEqual(via_reports.reports, via_sessions.reports)
+        self.assertEqual(len(via_reports), len(via_sessions))
+        self.assertEqual(
+            via_reports.completed_count, via_sessions.completed_count
+        )
+        self.assertEqual(
+            via_reports.sessions_with_exception,
+            via_sessions.sessions_with_exception,
+        )
+        self.assertEqual(
+            via_reports.total_exception_count,
+            via_sessions.total_exception_count,
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
