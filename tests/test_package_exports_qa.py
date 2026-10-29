@@ -29,6 +29,7 @@ ENGINE_SOURCES = {
     "all_profiles": profiles,
     "needs_manual_confirmation": profiles,
     "needs_manual_confirmations": profiles,
+    "needs_manual_confirmations_for_kinds": profiles,
     "profile_for": profiles,
     "profiles_for": profiles,
     "CareReport": report,
@@ -128,6 +129,11 @@ class TestBulkHelperExports(unittest.TestCase):
         self.assertIs(
             engine.needs_manual_confirmations,
             profiles.needs_manual_confirmations,
+        )
+        self.assertIn("needs_manual_confirmations_for_kinds", engine.__all__)
+        self.assertIs(
+            engine.needs_manual_confirmations_for_kinds,
+            profiles.needs_manual_confirmations_for_kinds,
         )
         self.assertIn("reports_for_sessions", engine.__all__)
         self.assertIs(

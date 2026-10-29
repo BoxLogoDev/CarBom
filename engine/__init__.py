@@ -14,6 +14,7 @@ from engine.profiles import (
     all_profiles,
     needs_manual_confirmation,
     needs_manual_confirmations,
+    needs_manual_confirmations_for_kinds,
     profile_for,
     profiles_for,
 )
@@ -56,6 +57,7 @@ __all__ = [
     "guidances_for_sessions",
     "needs_manual_confirmation",
     "needs_manual_confirmations",
+    "needs_manual_confirmations_for_kinds",
     "profile_for",
     "profiles_for",
     "report_for_session",

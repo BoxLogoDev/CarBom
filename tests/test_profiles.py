@@ -7,6 +7,7 @@ from engine import (
     PassengerProfile,
     needs_manual_confirmation,
     needs_manual_confirmations,
+    needs_manual_confirmations_for_kinds,
     profile_for,
     profiles_for,
 )
@@ -157,6 +158,60 @@ class NeedsManualConfirmationsTest(unittest.TestCase):
         )
         self.assertIsInstance(result, tuple)
         for value in result:
+            self.assertIsInstance(value, bool)
+
+
+class NeedsManualConfirmationsForKindsTest(unittest.TestCase):
+    def test_empty_input_returns_empty_tuple_for_both_belt_states(self):
+        self.assertEqual(
+            needs_manual_confirmations_for_kinds([], belt_buckled=True), ()
+        )
+        self.assertEqual(
+            needs_manual_confirmations_for_kinds([], belt_buckled=False), ()
+        )
+
+    def test_all_kinds_unbelted_matches_profiles_for_combination(self):
+        kinds = list(PassengerKind)
+        result = needs_manual_confirmations_for_kinds(
+            kinds, belt_buckled=False
+        )
+        self.assertEqual(result, (False, True, False, False))
+        self.assertEqual(
+            result,
+            needs_manual_confirmations(
+                profiles_for(kinds), belt_buckled=False
+            ),
+        )
+
+    def test_all_kinds_belted_are_all_false(self):
+        result = needs_manual_confirmations_for_kinds(
+            list(PassengerKind), belt_buckled=True
+        )
+        self.assertEqual(result, (False, False, False, False))
+
+    def test_mixed_string_none_and_unknown_inputs(self):
+        result = needs_manual_confirmations_for_kinds(
+            ["pet", None, " unknown ", " ELDER "], belt_buckled=False
+        )
+        self.assertEqual(result, (True, False, False, False))
+
+    def test_order_and_duplicates_are_kept(self):
+        result = needs_manual_confirmations_for_kinds(
+            ["pet", PassengerKind.CHILD, "pet"], belt_buckled=False
+        )
+        self.assertEqual(result, (True, False, True))
+
+    def test_generator_input_matches_list_input_and_is_tuple_of_bools(self):
+        kinds = ["pet", PassengerKind.CHILD, None]
+        from_list = needs_manual_confirmations_for_kinds(
+            kinds, belt_buckled=False
+        )
+        from_generator = needs_manual_confirmations_for_kinds(
+            (kind for kind in kinds), belt_buckled=False
+        )
+        self.assertEqual(from_generator, from_list)
+        self.assertIsInstance(from_generator, tuple)
+        for value in from_generator:
             self.assertIsInstance(value, bool)
 
 
