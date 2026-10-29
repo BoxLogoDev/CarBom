@@ -1,0 +1,12 @@
+scenario: dropoff_normal
+final_state: COMPLETED (expected COMPLETED)
+passenger_present: False
+transitions:
+  IDLE -> BOARDING (rear_door_opened) @ 0.0
+  BOARDING -> ONBOARD (passenger_onboard) @ 60.0
+  ONBOARD -> DRIVING (ignition_on) @ 120.0
+  DRIVING -> ARRIVED (ignition_off) @ 180.0
+  ARRIVED -> ALIGHTING (alighting_started) @ 240.0
+  ALIGHTING -> COMPLETED (alighting_confirmed) @ 300.0
+guidance: INFO / completed / 하차 확인이 완료되었습니다.
+report: 하차 확인 완료 · 예외 없음

@@ -7,6 +7,7 @@
 실내 온도는 35도 이상에서 표현과 이유를 한 단계 올린다.
 대량 헬퍼는 세션들을 입력 순서대로 읽어 안내들을 돌려주며,
 세션을 바꾸지 않는다.
+짝 헬퍼는 세션마다 다른 목적지 맥락을 짝지어 안내들을 돌려준다.
 """
 
 from __future__ import annotations
@@ -243,6 +244,37 @@ def guidances_for_sessions(
     )
 
 
+def guidances_for_sessions_by_context(
+    sessions: Iterable[CareSession],
+    contexts: Iterable[DestinationContext | str | None],
+) -> tuple[Guidance, ...]:
+    """세션마다 다른 목적지 맥락을 짝지어 안내들을 돌려준다. 세션은 바꾸지 않는다.
+
+    guidances_for_sessions(같은 맥락을 모든 세션에 적용)의 짝 버전이다.
+    sessions와 contexts를 먼저 각각 tuple로 구체화하고, 입력 순서대로
+    짝지어 각 세션에 guidance_for_session(session, context=context)를
+    적용한 tuple을 돌려준다. 빈 입력(둘 다 빈 경우)이면 빈 tuple이다.
+    중복은 중복 그대로 유지하고, 각 context는 Enum·문자열·None을
+    그대로 전달한다(정규화는 guidance_for_session 경로가 담당한다).
+
+    Raises:
+        ValueError: sessions와 contexts의 길이가 다르면 낸다.
+            길이 검사가 모든 안내 생성보다 먼저 끝나므로 부분 결과는
+            돌려주지 않는다.
+    """
+    sessions_tuple = tuple(sessions)
+    contexts_tuple = tuple(contexts)
+    if len(sessions_tuple) != len(contexts_tuple):
+        raise ValueError(
+            "세션 수와 목적지 맥락 수가 다릅니다: "
+            f"{len(sessions_tuple)} != {len(contexts_tuple)}"
+        )
+    return tuple(
+        guidance_for_session(session, context=context)
+        for session, context in zip(sessions_tuple, contexts_tuple)
+    )
+
+
 __all__ = [
     "DestinationContext",
     "Guidance",
@@ -250,4 +282,5 @@ __all__ = [
     "guidance_for",
     "guidance_for_session",
     "guidances_for_sessions",
+    "guidances_for_sessions_by_context",
 ]

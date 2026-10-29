@@ -14,6 +14,7 @@ from engine import (
     guidance_for,
     guidance_for_session,
     guidances_for_sessions,
+    guidances_for_sessions_by_context,
 )
 
 
@@ -277,6 +278,119 @@ class GuidancesForSessionsTest(unittest.TestCase):
         )
 
         self.assertEqual(from_string, from_enum)
+
+
+class GuidancesForSessionsByContextTest(unittest.TestCase):
+    def _arrived_session(self):
+        session = CareSession()
+        board_drive_and_arrive(session)
+        self.assertEqual(session.state, SessionState.ARRIVED)
+        return session
+
+    def _boarding_session(self):
+        session = CareSession()
+        session.apply_snapshot(snapshot(rear_door=DoorState.OPEN))
+        self.assertEqual(session.state, SessionState.BOARDING)
+        return session
+
+    def test_empty_input_returns_empty_tuple(self):
+        self.assertEqual(guidances_for_sessions_by_context([], []), ())
+        self.assertEqual(
+            guidances_for_sessions_by_context(iter(()), iter(())), ()
+        )
+
+    def test_paired_contexts_differ_and_match_individual_calls(self):
+        arrived_a = self._arrived_session()
+        arrived_b = self._arrived_session()
+
+        result = guidances_for_sessions_by_context(
+            [arrived_a, arrived_b],
+            [DestinationContext.DROPOFF, DestinationContext.PICKUP],
+        )
+
+        self.assertIsInstance(result, tuple)
+        self.assertEqual(len(result), 2)
+        self.assertIn("등원", result[0].text)
+        self.assertIn("하원", result[1].text)
+        self.assertNotEqual(result[0].text, result[1].text)
+        self.assertNotEqual(result[0].reason, result[1].reason)
+        self.assertEqual(
+            result[0],
+            guidance_for_session(
+                arrived_a, context=DestinationContext.DROPOFF
+            ),
+        )
+        self.assertEqual(
+            result[1],
+            guidance_for_session(
+                arrived_b, context=DestinationContext.PICKUP
+            ),
+        )
+
+    def test_length_mismatch_raises_value_error_both_ways(self):
+        arrived = self._arrived_session()
+        with self.assertRaises(ValueError):
+            guidances_for_sessions_by_context(
+                [arrived, CareSession()], [DestinationContext.DROPOFF]
+            )
+        with self.assertRaises(ValueError):
+            guidances_for_sessions_by_context(
+                [arrived],
+                [DestinationContext.DROPOFF, DestinationContext.PICKUP],
+            )
+
+    def test_string_and_none_contexts_fall_back_like_individual_calls(self):
+        boarding = self._boarding_session()
+        arrived = self._arrived_session()
+        idle = CareSession()
+
+        result = guidances_for_sessions_by_context(
+            [boarding, arrived, idle], ["dropoff", None, "unknown"]
+        )
+
+        self.assertEqual(
+            result,
+            (
+                guidance_for_session(boarding, context="dropoff"),
+                guidance_for_session(arrived, context=None),
+                guidance_for_session(idle, context="unknown"),
+            ),
+        )
+        self.assertIn("등원", result[0].text)
+
+    def test_generator_inputs_match_list_inputs_and_duplicates_preserved(self):
+        arrived = self._arrived_session()
+        sessions = [arrived, arrived]
+        contexts = [DestinationContext.DROPOFF, DestinationContext.DROPOFF]
+
+        from_list = guidances_for_sessions_by_context(sessions, contexts)
+        from_generator = guidances_for_sessions_by_context(
+            (s for s in sessions), (c for c in contexts)
+        )
+
+        self.assertEqual(from_generator, from_list)
+        self.assertEqual(len(from_list), 2)
+        self.assertEqual(from_list[0], from_list[1])
+
+    def test_sessions_are_not_mutated(self):
+        boarding = self._boarding_session()
+        arrived = self._arrived_session()
+        sessions = [boarding, arrived]
+        before = [
+            (s.state, len(s.history), s.current_snapshot, s.passenger_present)
+            for s in sessions
+        ]
+
+        guidances_for_sessions_by_context(
+            sessions,
+            [DestinationContext.DROPOFF, DestinationContext.PICKUP],
+        )
+
+        after = [
+            (s.state, len(s.history), s.current_snapshot, s.passenger_present)
+            for s in sessions
+        ]
+        self.assertEqual(after, before)
 
 
 if __name__ == "__main__":

@@ -24,6 +24,7 @@ ENGINE_SOURCES = {
     "guidance_for": guidance,
     "guidance_for_session": guidance,
     "guidances_for_sessions": guidance,
+    "guidances_for_sessions_by_context": guidance,
     "PassengerKind": profiles,
     "PassengerProfile": profiles,
     "all_profiles": profiles,
@@ -124,6 +125,11 @@ class TestBulkHelperExports(unittest.TestCase):
         self.assertIn("guidances_for_sessions", engine.__all__)
         self.assertIs(
             engine.guidances_for_sessions, guidance.guidances_for_sessions
+        )
+        self.assertIn("guidances_for_sessions_by_context", engine.__all__)
+        self.assertIs(
+            engine.guidances_for_sessions_by_context,
+            guidance.guidances_for_sessions_by_context,
         )
         self.assertIn("profiles_for", engine.__all__)
         self.assertIs(engine.profiles_for, profiles.profiles_for)
