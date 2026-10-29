@@ -11,6 +11,7 @@ from engine.adapters import (
     replay,
     replay_scenario,
     replay_scenarios,
+    replay_scenarios_by_name,
     scenario_snapshots,
     snapshots_for_scenarios,
 )
@@ -241,6 +242,86 @@ class ReplayScenariosTest(unittest.TestCase):
         for session in sessions:
             self.assertEqual(session.state, SessionState.IDLE)
             self.assertEqual(session.history, [])
+
+
+class ReplayScenariosByNameTest(unittest.TestCase):
+    def test_empty_input_returns_empty_tuple(self):
+        self.assertEqual(replay_scenarios_by_name([], []), ())
+
+    def test_pairs_distinct_scenarios_with_sessions(self):
+        sessions = [CareSession(), CareSession()]
+
+        result = replay_scenarios_by_name(
+            sessions, ["dropoff_normal", "forgotten_rising_temp"]
+        )
+
+        self.assertEqual(
+            result, (SessionState.COMPLETED, SessionState.EXCEPTION)
+        )
+        for state, session in zip(result, sessions):
+            self.assertEqual(state, session.state)
+        self.assertTrue(sessions[1].passenger_present)
+        self.assertEqual(sessions[1].current_snapshot.cabin_temp_c, 35.5)
+
+    def test_all_scenarios_with_start_propagates(self):
+        sessions = [CareSession(), CareSession(), CareSession()]
+
+        result = replay_scenarios_by_name(
+            sessions, list(SCENARIO_NAMES), start=1000.0
+        )
+
+        self.assertEqual(
+            result,
+            (
+                SessionState.COMPLETED,
+                SessionState.EXCEPTION,
+                SessionState.COMPLETED,
+            ),
+        )
+        self.assertEqual(sessions[0].history[0].timestamp, 1000.0)
+
+    def test_length_mismatch_raises_and_leaves_sessions_untouched(self):
+        sessions = [CareSession(), CareSession()]
+
+        with self.assertRaises(ValueError):
+            replay_scenarios_by_name(sessions, ["dropoff_normal"])
+        with self.assertRaises(ValueError):
+            replay_scenarios_by_name(
+                sessions[:1], ["dropoff_normal", "pet_dropoff"]
+            )
+
+        for session in sessions:
+            self.assertEqual(session.state, SessionState.IDLE)
+            self.assertEqual(session.history, [])
+
+    def test_unknown_name_raises_and_leaves_all_sessions_untouched(self):
+        sessions = [CareSession(), CareSession()]
+
+        with self.assertRaises(ValueError):
+            replay_scenarios_by_name(
+                sessions, ["dropoff_normal", "unknown_scenario"]
+            )
+
+        for session in sessions:
+            self.assertEqual(session.state, SessionState.IDLE)
+            self.assertEqual(session.history, [])
+
+    def test_generator_inputs_match_list_inputs(self):
+        list_sessions = [CareSession(), CareSession()]
+        generator_sessions = [CareSession(), CareSession()]
+        names = ["dropoff_normal", "pet_dropoff"]
+
+        list_result = replay_scenarios_by_name(list_sessions, names)
+        generator_result = replay_scenarios_by_name(
+            (session for session in generator_sessions),
+            (name for name in names),
+        )
+
+        self.assertEqual(generator_result, list_result)
+        self.assertEqual(
+            [session.state for session in generator_sessions],
+            [session.state for session in list_sessions],
+        )
 
 
 if __name__ == "__main__":

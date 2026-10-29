@@ -27,6 +27,7 @@ __all__ = [
     "replay",
     "replay_scenario",
     "replay_scenarios",
+    "replay_scenarios_by_name",
     "scenario_snapshots",
     "snapshots_for_scenarios",
 ]
@@ -196,3 +197,37 @@ def replay_scenarios(
     """
     snapshots = scenario_snapshots(name, start)
     return tuple(replay(session, snapshots) for session in sessions)
+
+
+def replay_scenarios_by_name(
+    sessions: Iterable[CareSession],
+    names: Iterable[str],
+    start: float = 0.0,
+) -> tuple[SessionState, ...]:
+    """세션마다 다른 시나리오를 짝지어 재생하고 최종 상태들을 돌려준다.
+
+    sessions와 names를 입력 순서대로 짝지어, 각 세션에 대응하는 이름의
+    시나리오를 재생하고 최종 상태들을 tuple로 묶는다. 빈 입력(둘 다 빈
+    경우)이면 빈 tuple이다. 중복은 중복 그대로 유지하고, start는 모든
+    시나리오에 동일하게 전달된다. replay_scenarios(같은 시나리오를 여러
+    세션에 재생)와 짝을 이루는, 세션마다 다른 시나리오를 재생하는 경로다.
+
+    Raises:
+        ValueError: sessions와 names의 길이가 다르면 낸다.
+            어떤 세션도 변경되지 않는다.
+        ValueError: 알 수 없는 시나리오 이름이 있으면 낸다.
+            모든 스냅샷을 적용 전에 먼저 조회하므로 어떤 세션도
+            변경되지 않는다.
+    """
+    sessions_tuple = tuple(sessions)
+    names_tuple = tuple(names)
+    if len(sessions_tuple) != len(names_tuple):
+        raise ValueError(
+            "세션 수와 시나리오 이름 수가 다릅니다: "
+            f"{len(sessions_tuple)} != {len(names_tuple)}"
+        )
+    snapshots_list = snapshots_for_scenarios(names_tuple, start)
+    return tuple(
+        replay(session, snapshots)
+        for session, snapshots in zip(sessions_tuple, snapshots_list)
+    )
