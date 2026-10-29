@@ -9,6 +9,7 @@
 알 수 없는 값은 profile_for와 같이 성인 프로필로 처리한다.
 대량 판정 헬퍼 needs_manual_confirmations는 프로필들을 순서대로 읽어 수동 확인 필요 여부 tuple을 돌려준다.
 종류 기반 헬퍼 needs_manual_confirmations_for_kinds는 종류 값들을 순서대로 읽어 각 종류의 프로필에 대한 수동 확인 필요 여부 tuple을 돌려준다.
+짝 헬퍼 needs_manual_confirmations_by_belt는 프로필마다 다른 벨트 상태를 짝지어 수동 확인 필요 여부 tuple을 돌려준다.
 """
 
 from __future__ import annotations
@@ -161,12 +162,43 @@ def needs_manual_confirmations_for_kinds(
     )
 
 
+def needs_manual_confirmations_by_belt(
+    profiles: Iterable[PassengerProfile], belt_flags: Iterable[bool]
+) -> tuple[bool, ...]:
+    """프로필마다 다른 벨트 상태를 짝지어 수동 탑승 확인이 필요한지 돌려준다.
+
+    needs_manual_confirmations(같은 벨트 상태를 모든 프로필에 적용)의
+    짝 버전이다. profiles와 belt_flags를 먼저 각각 tuple로 구체화하고,
+    입력 순서대로 짝지어 각 원소에
+    needs_manual_confirmation(profile, belt_buckled=flag)를 적용한
+    tuple을 돌려준다. 빈 입력(둘 다 빈 경우)이면 빈 tuple이다.
+    중복은 중복 그대로 유지한다.
+
+    Raises:
+        ValueError: profiles와 belt_flags의 길이가 다르면 낸다.
+            길이 검사가 모든 판정보다 먼저 끝나므로 부분 결과는
+            돌려주지 않는다.
+    """
+    profiles_tuple = tuple(profiles)
+    belt_flags_tuple = tuple(belt_flags)
+    if len(profiles_tuple) != len(belt_flags_tuple):
+        raise ValueError(
+            "프로필 수와 벨트 상태 수가 다릅니다: "
+            f"{len(profiles_tuple)} != {len(belt_flags_tuple)}"
+        )
+    return tuple(
+        needs_manual_confirmation(profile, belt_buckled=flag)
+        for profile, flag in zip(profiles_tuple, belt_flags_tuple)
+    )
+
+
 __all__ = [
     "PassengerKind",
     "PassengerProfile",
     "all_profiles",
     "needs_manual_confirmation",
     "needs_manual_confirmations",
+    "needs_manual_confirmations_by_belt",
     "needs_manual_confirmations_for_kinds",
     "profile_for",
     "profiles_for",
