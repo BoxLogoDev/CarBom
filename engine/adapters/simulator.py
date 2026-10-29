@@ -29,6 +29,7 @@ __all__ = [
     "replay_scenarios",
     "replay_scenarios_by_name",
     "replay_scenarios_by_name_and_start",
+    "replay_snapshot_sequences_for_sessions",
     "scenario_snapshots",
     "snapshots_for_scenarios",
     "snapshots_for_scenarios_by_start",
@@ -301,4 +302,42 @@ def replay_scenarios_by_name_and_start(
     return tuple(
         replay(session, snapshots)
         for session, snapshots in zip(sessions_tuple, snapshots_list)
+    )
+
+
+def replay_snapshot_sequences_for_sessions(
+    sessions: Iterable[CareSession],
+    snapshot_sequences: Iterable[Iterable[SignalSnapshot]],
+) -> tuple[SessionState, ...]:
+    """세션마다 다른 스냅샷 시퀀스를 짝지어 재생하고 최종 상태들을 돌려준다.
+
+    sessions와 snapshot_sequences를 입력 순서대로 짝지어, 각 세션에
+    대응하는 시퀀스를 replay로 적용하고 최종 상태들을 tuple로 묶는다.
+    Vehicle SDK 쪽 apply_raw_sequences_for_sessions(세션마다 다른 raw
+    시퀀스를 짝지어 적용)와 짝을 이루는 시뮬레이터 쪽 경로이며,
+    replay_scenarios_by_name(이름으로 조회한 시나리오를 짝지어 재생)과
+    달리 스냅샷 시퀀스를 직접 짝지어 재생한다.
+    sessions와 snapshot_sequences를 먼저 각각 tuple로 구체화하고, 각
+    내부 시퀀스도 적용 전에 tuple로 구체화한다. 그래서 제너레이터
+    입력도 리스트 입력과 같게 동작한다.
+    빈 입력(둘 다 빈 경우)이면 빈 tuple이다. 내부 시퀀스가 빈 세션은
+    변경하지 않고 현재 상태를 돌려준다. 중복은 중복 그대로 유지한다.
+
+    Raises:
+        ValueError: sessions와 snapshot_sequences의 길이가 다르면 낸다.
+            길이 검사와 구체화가 모든 적용보다 먼저 끝나므로
+            어떤 세션도 변경되지 않는다.
+    """
+    sessions_tuple = tuple(sessions)
+    sequences_tuple = tuple(
+        tuple(sequence) for sequence in snapshot_sequences
+    )
+    if len(sessions_tuple) != len(sequences_tuple):
+        raise ValueError(
+            "세션 수와 스냅샷 시퀀스 수가 다릅니다: "
+            f"{len(sessions_tuple)} != {len(sequences_tuple)}"
+        )
+    return tuple(
+        replay(session, snapshots)
+        for session, snapshots in zip(sessions_tuple, sequences_tuple)
     )

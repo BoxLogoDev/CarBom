@@ -13,6 +13,7 @@ from engine.adapters import (
     replay_scenarios,
     replay_scenarios_by_name,
     replay_scenarios_by_name_and_start,
+    replay_snapshot_sequences_for_sessions,
     scenario_snapshots,
     snapshots_for_scenarios,
     snapshots_for_scenarios_by_start,
@@ -477,6 +478,102 @@ class ReplayScenariosByNameAndStartTest(unittest.TestCase):
         )
         for session in generator_sessions:
             self.assertEqual(session.history[0].timestamp, 500.0)
+
+
+class ReplaySnapshotSequencesForSessionsTest(unittest.TestCase):
+    def test_empty_input_returns_empty_tuple(self):
+        self.assertEqual(
+            replay_snapshot_sequences_for_sessions([], []), ()
+        )
+
+    def test_pairs_distinct_sequences_with_sessions(self):
+        sessions = [CareSession(), CareSession()]
+
+        result = replay_snapshot_sequences_for_sessions(
+            sessions,
+            [
+                dropoff_normal_snapshots(),
+                forgotten_rising_temp_snapshots(),
+            ],
+        )
+
+        self.assertEqual(
+            result, (SessionState.COMPLETED, SessionState.EXCEPTION)
+        )
+        for state, session in zip(result, sessions):
+            self.assertEqual(state, session.state)
+        self.assertTrue(sessions[1].passenger_present)
+        self.assertEqual(sessions[1].current_snapshot.cabin_temp_c, 35.5)
+
+    def test_all_scenarios_paired(self):
+        sessions = [CareSession(), CareSession(), CareSession()]
+        sequences = [
+            scenario_snapshots(name) for name in SCENARIO_NAMES
+        ]
+
+        result = replay_snapshot_sequences_for_sessions(
+            sessions, sequences
+        )
+
+        self.assertEqual(
+            result,
+            (
+                SessionState.COMPLETED,
+                SessionState.EXCEPTION,
+                SessionState.COMPLETED,
+            ),
+        )
+
+    def test_length_mismatch_raises_and_leaves_sessions_untouched(self):
+        sessions = [CareSession(), CareSession()]
+
+        with self.assertRaises(ValueError):
+            replay_snapshot_sequences_for_sessions(
+                sessions, [dropoff_normal_snapshots()]
+            )
+        with self.assertRaises(ValueError):
+            replay_snapshot_sequences_for_sessions(
+                sessions[:1],
+                [dropoff_normal_snapshots(), pet_dropoff_snapshots()],
+            )
+
+        for session in sessions:
+            self.assertEqual(session.state, SessionState.IDLE)
+            self.assertEqual(session.history, [])
+
+    def test_empty_inner_sequence_leaves_session_untouched(self):
+        sessions = [CareSession(), CareSession()]
+
+        result = replay_snapshot_sequences_for_sessions(
+            sessions, [dropoff_normal_snapshots(), []]
+        )
+
+        self.assertEqual(
+            result, (SessionState.COMPLETED, SessionState.IDLE)
+        )
+        self.assertEqual(sessions[1].history, [])
+
+    def test_generator_inputs_match_list_inputs(self):
+        list_sessions = [CareSession(), CareSession()]
+        generator_sessions = [CareSession(), CareSession()]
+        sequences = [
+            dropoff_normal_snapshots(),
+            pet_dropoff_snapshots(),
+        ]
+
+        list_result = replay_snapshot_sequences_for_sessions(
+            list_sessions, sequences
+        )
+        generator_result = replay_snapshot_sequences_for_sessions(
+            (session for session in generator_sessions),
+            (tuple(snapshot for snapshot in seq) for seq in sequences),
+        )
+
+        self.assertEqual(generator_result, list_result)
+        self.assertEqual(
+            [session.state for session in generator_sessions],
+            [session.state for session in list_sessions],
+        )
 
 
 if __name__ == "__main__":
