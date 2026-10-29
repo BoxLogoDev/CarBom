@@ -28,6 +28,7 @@ __all__ = [
     "replay_scenario",
     "replay_scenarios",
     "replay_scenarios_by_name",
+    "replay_scenarios_by_name_and_start",
     "scenario_snapshots",
     "snapshots_for_scenarios",
     "snapshots_for_scenarios_by_start",
@@ -258,6 +259,45 @@ def replay_scenarios_by_name(
             f"{len(sessions_tuple)} != {len(names_tuple)}"
         )
     snapshots_list = snapshots_for_scenarios(names_tuple, start)
+    return tuple(
+        replay(session, snapshots)
+        for session, snapshots in zip(sessions_tuple, snapshots_list)
+    )
+
+
+def replay_scenarios_by_name_and_start(
+    sessions: Iterable[CareSession],
+    names: Iterable[str],
+    starts: Iterable[float],
+) -> tuple[SessionState, ...]:
+    """세션마다 다른 시나리오를 다른 시작 시각으로 짝지어 재생한다.
+
+    sessions와 names와 starts를 입력 순서대로 짝지어, 각 세션에 대응하는
+    이름의 시나리오를 대응하는 시작 시각으로 재생하고 최종 상태들을
+    tuple로 묶는다. 빈 입력(셋 다 빈 경우)이면 빈 tuple이다. 중복은
+    중복 그대로 유지한다. replay_scenarios_by_name(같은 start를 모든
+    시나리오에 전달)의 짝 시작시각 버전으로, 시나리오마다 다른 시작
+    시각을 전달하는 경로다.
+
+    Raises:
+        ValueError: sessions와 names와 starts의 길이가 다르면 낸다.
+            어떤 세션도 변경되지 않는다.
+        ValueError: 알 수 없는 시나리오 이름이 있으면 낸다.
+            모든 스냅샷을 적용 전에 먼저 조회하므로 어떤 세션도
+            변경되지 않는다.
+    """
+    sessions_tuple = tuple(sessions)
+    names_tuple = tuple(names)
+    starts_tuple = tuple(starts)
+    if not (len(sessions_tuple) == len(names_tuple) == len(starts_tuple)):
+        raise ValueError(
+            "세션 수와 시나리오 이름 수와 시작 시각 수가 다릅니다: "
+            f"{len(sessions_tuple)} != {len(names_tuple)} != "
+            f"{len(starts_tuple)}"
+        )
+    snapshots_list = snapshots_for_scenarios_by_start(
+        names_tuple, starts_tuple
+    )
     return tuple(
         replay(session, snapshots)
         for session, snapshots in zip(sessions_tuple, snapshots_list)

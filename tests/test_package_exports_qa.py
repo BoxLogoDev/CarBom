@@ -59,6 +59,7 @@ ADAPTER_SOURCES = {
     "replay_scenario": simulator,
     "replay_scenarios": simulator,
     "replay_scenarios_by_name": simulator,
+    "replay_scenarios_by_name_and_start": simulator,
     "scenario_snapshots": simulator,
     "snapshots_for_scenarios": simulator,
     "snapshots_for_scenarios_by_start": simulator,
@@ -168,6 +169,13 @@ class TestBulkHelperExports(unittest.TestCase):
         self.assertIs(
             adapters.replay_scenarios_by_name,
             simulator.replay_scenarios_by_name,
+        )
+        self.assertIn(
+            "replay_scenarios_by_name_and_start", adapters.__all__
+        )
+        self.assertIs(
+            adapters.replay_scenarios_by_name_and_start,
+            simulator.replay_scenarios_by_name_and_start,
         )
         self.assertIn("apply_raws_for_sessions", adapters.__all__)
         self.assertIs(

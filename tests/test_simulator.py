@@ -12,6 +12,7 @@ from engine.adapters import (
     replay_scenario,
     replay_scenarios,
     replay_scenarios_by_name,
+    replay_scenarios_by_name_and_start,
     scenario_snapshots,
     snapshots_for_scenarios,
     snapshots_for_scenarios_by_start,
@@ -367,6 +368,115 @@ class ReplayScenariosByNameTest(unittest.TestCase):
             [session.state for session in generator_sessions],
             [session.state for session in list_sessions],
         )
+
+
+class ReplayScenariosByNameAndStartTest(unittest.TestCase):
+    def test_empty_input_returns_empty_tuple(self):
+        self.assertEqual(
+            replay_scenarios_by_name_and_start([], [], []), ()
+        )
+
+    def test_pairs_distinct_scenarios_with_distinct_starts(self):
+        sessions = [CareSession(), CareSession()]
+
+        result = replay_scenarios_by_name_and_start(
+            sessions,
+            ["dropoff_normal", "forgotten_rising_temp"],
+            [0.0, 1000.0],
+        )
+
+        self.assertEqual(
+            result, (SessionState.COMPLETED, SessionState.EXCEPTION)
+        )
+        for state, session in zip(result, sessions):
+            self.assertEqual(state, session.state)
+        self.assertTrue(sessions[1].passenger_present)
+        self.assertEqual(sessions[1].current_snapshot.cabin_temp_c, 35.5)
+        self.assertEqual(sessions[0].history[0].timestamp, 0.0)
+        self.assertEqual(sessions[1].history[0].timestamp, 1000.0)
+
+    def test_all_scenarios_with_distinct_starts(self):
+        sessions = [CareSession(), CareSession(), CareSession()]
+        starts = (0.0, 1000.0, 2000.0)
+
+        result = replay_scenarios_by_name_and_start(
+            sessions, list(SCENARIO_NAMES), list(starts)
+        )
+
+        self.assertEqual(
+            result,
+            (
+                SessionState.COMPLETED,
+                SessionState.EXCEPTION,
+                SessionState.COMPLETED,
+            ),
+        )
+        for session, start in zip(sessions, starts):
+            self.assertEqual(session.history[0].timestamp, start)
+
+    def test_length_mismatch_raises_and_leaves_sessions_untouched(self):
+        sessions = [CareSession(), CareSession()]
+
+        with self.assertRaises(ValueError):
+            replay_scenarios_by_name_and_start(
+                sessions, ["dropoff_normal"], [0.0, 1000.0]
+            )
+        with self.assertRaises(ValueError):
+            replay_scenarios_by_name_and_start(
+                sessions,
+                ["dropoff_normal", "pet_dropoff"],
+                [0.0],
+            )
+        with self.assertRaises(ValueError):
+            replay_scenarios_by_name_and_start(
+                sessions[:1],
+                ["dropoff_normal", "pet_dropoff"],
+                [0.0, 1000.0],
+            )
+
+        for session in sessions:
+            self.assertEqual(session.state, SessionState.IDLE)
+            self.assertEqual(session.history, [])
+
+    def test_unknown_name_raises_and_leaves_all_sessions_untouched(self):
+        sessions = [CareSession(), CareSession()]
+
+        with self.assertRaises(ValueError):
+            replay_scenarios_by_name_and_start(
+                sessions,
+                ["dropoff_normal", "unknown_scenario"],
+                [0.0, 1000.0],
+            )
+
+        for session in sessions:
+            self.assertEqual(session.state, SessionState.IDLE)
+            self.assertEqual(session.history, [])
+
+    def test_generator_inputs_match_list_inputs_and_keep_duplicates(self):
+        list_sessions = [CareSession(), CareSession()]
+        generator_sessions = [CareSession(), CareSession()]
+        names = ["pet_dropoff", "pet_dropoff"]
+        starts = [500.0, 500.0]
+
+        list_result = replay_scenarios_by_name_and_start(
+            list_sessions, names, starts
+        )
+        generator_result = replay_scenarios_by_name_and_start(
+            (session for session in generator_sessions),
+            (name for name in names),
+            (start for start in starts),
+        )
+
+        self.assertEqual(generator_result, list_result)
+        self.assertEqual(
+            list_result, (SessionState.COMPLETED, SessionState.COMPLETED)
+        )
+        self.assertEqual(
+            [session.state for session in generator_sessions],
+            [session.state for session in list_sessions],
+        )
+        for session in generator_sessions:
+            self.assertEqual(session.history[0].timestamp, 500.0)
 
 
 if __name__ == "__main__":
