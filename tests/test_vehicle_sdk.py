@@ -12,6 +12,7 @@ from engine.adapters import (
     apply_raw,
     apply_raws,
     apply_raws_for_sessions,
+    apply_raw_sequences_for_sessions,
     dropoff_normal_snapshots,
     forgotten_rising_temp_snapshots,
     poll_into_sessions,
@@ -400,6 +401,95 @@ class ApplyRawsForSessionsTest(unittest.TestCase):
         list_states = apply_raws_for_sessions(list_sessions, raws)
         generator_states = apply_raws_for_sessions(
             iter(generator_sessions), raws
+        )
+        self.assertEqual(generator_states, list_states)
+        self.assertEqual(
+            [session.state for session in generator_sessions],
+            [session.state for session in list_sessions],
+        )
+
+
+class ApplyRawSequencesForSessionsTest(unittest.TestCase):
+    def test_empty_inputs_give_empty_tuple(self):
+        self.assertEqual(apply_raw_sequences_for_sessions([], []), ())
+
+    def test_paired_sequences_apply_to_matching_sessions(self):
+        dropoff_raws = raws_from_snapshots(dropoff_normal_snapshots())
+        forgotten_raws = raws_from_snapshots(
+            forgotten_rising_temp_snapshots()
+        )
+        sessions = [CareSession(), CareSession()]
+        states = apply_raw_sequences_for_sessions(
+            sessions, [dropoff_raws, forgotten_raws]
+        )
+        self.assertEqual(
+            states, (SessionState.COMPLETED, SessionState.EXCEPTION)
+        )
+        self.assertEqual(states, (sessions[0].state, sessions[1].state))
+        self.assertFalse(sessions[0].passenger_present)
+        self.assertTrue(sessions[1].passenger_present)
+        self.assertEqual(sessions[1].current_snapshot.cabin_temp_c, 35.5)
+
+    def test_three_fixed_scenarios_paired(self):
+        sequences = [
+            raws_from_snapshots(scenario_snapshots(name))
+            for name in (
+                "dropoff_normal",
+                "forgotten_rising_temp",
+                "pet_dropoff",
+            )
+        ]
+        sessions = [CareSession(), CareSession(), CareSession()]
+        states = apply_raw_sequences_for_sessions(sessions, sequences)
+        self.assertEqual(
+            states,
+            (
+                SessionState.COMPLETED,
+                SessionState.EXCEPTION,
+                SessionState.COMPLETED,
+            ),
+        )
+        self.assertEqual(
+            states, tuple(session.state for session in sessions)
+        )
+
+    def test_length_mismatch_raises_and_leaves_sessions_unchanged(self):
+        raws = raws_from_snapshots(dropoff_normal_snapshots())
+        more_sessions = [CareSession(), CareSession()]
+        with self.assertRaises(ValueError):
+            apply_raw_sequences_for_sessions(more_sessions, [raws])
+        fewer_sessions = [CareSession()]
+        with self.assertRaises(ValueError):
+            apply_raw_sequences_for_sessions(fewer_sessions, [raws, raws])
+        for session in more_sessions + fewer_sessions:
+            self.assertEqual(session.state, SessionState.IDLE)
+            self.assertEqual(session.history, [])
+
+    def test_empty_inner_sequence_leaves_that_session_unchanged(self):
+        dropoff_raws = raws_from_snapshots(dropoff_normal_snapshots())
+        sessions = [CareSession(), CareSession()]
+        states = apply_raw_sequences_for_sessions(
+            sessions, [[], dropoff_raws]
+        )
+        self.assertEqual(
+            states, (SessionState.IDLE, SessionState.COMPLETED)
+        )
+        self.assertEqual(sessions[0].history, [])
+        self.assertEqual(sessions[1].state, SessionState.COMPLETED)
+
+    def test_generator_inputs_match_list_input(self):
+        dropoff_raws = raws_from_snapshots(dropoff_normal_snapshots())
+        forgotten_raws = raws_from_snapshots(
+            forgotten_rising_temp_snapshots()
+        )
+        list_sessions = [CareSession(), CareSession()]
+        generator_sessions = [CareSession(), CareSession()]
+        list_states = apply_raw_sequences_for_sessions(
+            list_sessions, [dropoff_raws, forgotten_raws]
+        )
+        generator_states = apply_raw_sequences_for_sessions(
+            iter(generator_sessions),
+            (iter(seq) for seq in (dropoff_raws, forgotten_raws)),
         )
         self.assertEqual(generator_states, list_states)
         self.assertEqual(

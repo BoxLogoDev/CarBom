@@ -26,6 +26,7 @@ __all__ = [
     "apply_raw",
     "apply_raws",
     "apply_raws_for_sessions",
+    "apply_raw_sequences_for_sessions",
     "poll_into_sessions",
     "poll_repeatedly_into_sessions",
     "poll_snapshots",
@@ -146,6 +147,42 @@ def apply_raws_for_sessions(
     """
     materialized = tuple(raws)
     return tuple(apply_raws(session, materialized) for session in sessions)
+
+
+def apply_raw_sequences_for_sessions(
+    sessions: Iterable[CareSession],
+    raw_sequences: Iterable[Iterable[Mapping[str, Any]]],
+) -> tuple[SessionState, ...]:
+    """세션마다 다른 원시 신호 시퀀스를 짝지어 적용하고 최종 상태들을 돌려준다.
+
+    sessions와 raw_sequences를 입력 순서대로 짝지어, 각 세션에 대응하는
+    시퀀스를 apply_raws로 적용하고 최종 상태들을 tuple로 묶는다.
+    apply_raws_for_sessions(같은 시퀀스를 모든 세션에 적용)와 짝을 이루는,
+    세션마다 다른 시퀀스를 적용하는 경로이며, simulator의
+    replay_scenarios_by_name과 짝을 이룬다.
+    sessions와 raw_sequences를 먼저 각각 tuple로 구체화하고, 각 내부
+    시퀀스도 적용 전에 tuple로 구체화한다. 그래서 제너레이터 입력도
+    리스트 입력과 같게 동작한다.
+    빈 입력(둘 다 빈 경우)이면 빈 tuple을 돌려준다.
+    내부 시퀀스가 빈 세션은 변경하지 않고 현재 상태를 돌려준다.
+    중복은 중복 그대로 유지한다.
+
+    Raises:
+        ValueError: sessions와 raw_sequences의 길이가 다르면 낸다.
+            길이 검사와 구체화가 모든 적용보다 먼저 끝나므로
+            어떤 세션도 변경되지 않는다.
+    """
+    sessions_tuple = tuple(sessions)
+    sequences_tuple = tuple(tuple(sequence) for sequence in raw_sequences)
+    if len(sessions_tuple) != len(sequences_tuple):
+        raise ValueError(
+            "세션 수와 원시 신호 시퀀스 수가 다릅니다: "
+            f"{len(sessions_tuple)} != {len(sequences_tuple)}"
+        )
+    return tuple(
+        apply_raws(session, sequence)
+        for session, sequence in zip(sessions_tuple, sequences_tuple)
+    )
 
 
 class VehicleSdkAdapter:

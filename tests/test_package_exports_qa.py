@@ -62,6 +62,7 @@ ADAPTER_SOURCES = {
     "apply_raw": vehicle_sdk,
     "apply_raws": vehicle_sdk,
     "apply_raws_for_sessions": vehicle_sdk,
+    "apply_raw_sequences_for_sessions": vehicle_sdk,
     "poll_into_sessions": vehicle_sdk,
     "poll_repeatedly_into_sessions": vehicle_sdk,
     "poll_snapshots": vehicle_sdk,
@@ -151,6 +152,11 @@ class TestBulkHelperExports(unittest.TestCase):
         self.assertIs(
             adapters.apply_raws_for_sessions,
             vehicle_sdk.apply_raws_for_sessions,
+        )
+        self.assertIn("apply_raw_sequences_for_sessions", adapters.__all__)
+        self.assertIs(
+            adapters.apply_raw_sequences_for_sessions,
+            vehicle_sdk.apply_raw_sequences_for_sessions,
         )
         self.assertIn("snapshots_for_scenarios", adapters.__all__)
         self.assertIs(
