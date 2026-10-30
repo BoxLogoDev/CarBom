@@ -20,6 +20,7 @@ from engine.adapters.simulator import (
 from engine.adapters.vehicle_sdk import (
     VehicleSdkAdapter,
     apply_raw,
+    apply_raw_for_sessions,
     apply_raws,
     apply_raws_for_sessions,
     apply_raw_sequences_for_sessions,
@@ -38,6 +39,7 @@ __all__ = [
     "SCENARIO_NAMES",
     "VehicleSdkAdapter",
     "apply_raw",
+    "apply_raw_for_sessions",
     "apply_raws",
     "apply_raws_for_sessions",
     "apply_raw_sequences_for_sessions",

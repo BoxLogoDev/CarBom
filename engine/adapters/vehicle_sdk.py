@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 __all__ = [
     "VehicleSdkAdapter",
     "apply_raw",
+    "apply_raw_for_sessions",
     "apply_raws",
     "apply_raws_for_sessions",
     "apply_raw_sequences_for_sessions",
@@ -117,6 +118,23 @@ def apply_raw(
     SDK 클라이언트 없이도 raw를 세션에 바로 넣을 수 있는 직접 경로이다.
     """
     return session.apply_snapshot(snapshot_from_raw(raw))
+
+
+def apply_raw_for_sessions(
+    sessions: Iterable[CareSession], raw: Mapping[str, Any]
+) -> tuple[SessionState, ...]:
+    """원시 신호 dict 하나를 여러 세션에 적용하고 상태들을 돌려준다.
+
+    apply_raw의 다중 세션 버전이다.
+    poll_into_sessions(신호를 한 번 읽어 여러 세션에 같은 스냅샷을
+    적용)의 raw 쪽 짝이다.
+    raw를 snapshot_from_raw로 딱 한 번만 변환하고, 그 같은
+    SignalSnapshot을 각 세션에 입력 순서대로 적용한다.
+    sessions를 입력 순서대로 읽고 반환된 상태들을 입력 순서대로 묶는다.
+    빈 sessions이면 빈 tuple을 돌려준다.
+    """
+    snapshot = snapshot_from_raw(raw)
+    return tuple(session.apply_snapshot(snapshot) for session in sessions)
 
 
 def apply_raws(

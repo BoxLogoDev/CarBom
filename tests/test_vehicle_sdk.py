@@ -10,6 +10,7 @@ import unittest
 from engine.adapters import (
     VehicleSdkAdapter,
     apply_raw,
+    apply_raw_for_sessions,
     apply_raws,
     apply_raws_for_sessions,
     apply_raw_sequences_for_sessions,
@@ -346,6 +347,87 @@ class ApplyRawTest(unittest.TestCase):
         generator_state = apply_raws(generator_session, iter(raws))
         self.assertEqual(generator_state, list_state)
         self.assertEqual(generator_session.state, list_session.state)
+
+
+class ApplyRawForSessionsTest(unittest.TestCase):
+    def test_empty_sessions_gives_empty_tuple(self):
+        self.assertEqual(
+            apply_raw_for_sessions([], {"rear_door_open": True}), ()
+        )
+
+    def test_rear_door_open_moves_both_sessions_to_boarding(self):
+        sessions = [CareSession(), CareSession()]
+        states = apply_raw_for_sessions(
+            sessions, {"rear_door_open": True}
+        )
+        self.assertEqual(
+            states, (SessionState.BOARDING, SessionState.BOARDING)
+        )
+        self.assertEqual(states, (sessions[0].state, sessions[1].state))
+
+    def test_locked_with_passenger_moves_prepared_sessions_to_exception(self):
+        sessions = [CareSession(), CareSession()]
+        for session in sessions:
+            apply_raw(session, {"rear_door_open": True})
+            apply_raw(session, {"rear_seat_belt_buckled": True})
+            apply_raw(
+                session,
+                {"rear_seat_belt_buckled": True, "ignition_on": True},
+            )
+            apply_raw(session, {"rear_seat_belt_buckled": True})
+            self.assertEqual(session.state, SessionState.ARRIVED)
+        states = apply_raw_for_sessions(
+            sessions,
+            {
+                "rear_seat_belt_buckled": True,
+                "locked": True,
+                "cabin_temp_c": 35.5,
+            },
+        )
+        self.assertEqual(
+            states, (SessionState.EXCEPTION, SessionState.EXCEPTION)
+        )
+        for session in sessions:
+            self.assertTrue(session.passenger_present)
+            self.assertEqual(session.current_snapshot.cabin_temp_c, 35.5)
+
+    def test_same_snapshot_is_shared_by_all_sessions(self):
+        sessions = [CareSession(), CareSession()]
+        apply_raw_for_sessions(
+            sessions, {"rear_door_open": True, "timestamp": 50.0}
+        )
+        self.assertIs(
+            sessions[0].current_snapshot, sessions[1].current_snapshot
+        )
+        self.assertEqual(sessions[0].current_snapshot.timestamp, 50.0)
+        self.assertEqual(
+            sessions[0].current_snapshot,
+            snapshot_from_raw({"rear_door_open": True, "timestamp": 50.0}),
+        )
+
+    def test_generator_sessions_matches_list_input(self):
+        list_sessions = [CareSession(), CareSession()]
+        generator_sessions = [CareSession(), CareSession()]
+        raw = {"rear_door_open": True}
+        list_states = apply_raw_for_sessions(list_sessions, raw)
+        generator_states = apply_raw_for_sessions(
+            iter(generator_sessions), raw
+        )
+        self.assertEqual(generator_states, list_states)
+        self.assertEqual(
+            [session.state for session in generator_sessions],
+            [session.state for session in list_sessions],
+        )
+
+    def test_returns_tuple_of_session_states(self):
+        sessions = [CareSession(), CareSession()]
+        states = apply_raw_for_sessions(
+            sessions, {"rear_door_open": True}
+        )
+        self.assertIsInstance(states, tuple)
+        self.assertEqual(len(states), 2)
+        for state in states:
+            self.assertIsInstance(state, SessionState)
 
 
 class ApplyRawsForSessionsTest(unittest.TestCase):
