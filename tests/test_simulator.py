@@ -21,6 +21,7 @@ from engine.adapters import (
     replay_scenarios_by_name_and_start,
     replay_scenarios_by_start,
     replay_snapshot_for_sessions,
+    replay_snapshots_for_sessions,
     replay_snapshot_sequence_for_sessions,
     replay_snapshot_sequences_for_sessions,
     scenario_snapshots,
@@ -851,6 +852,120 @@ class ReplaySnapshotForSessionsTest(unittest.TestCase):
         self.assertEqual(len(result), 2)
         for state in result:
             self.assertIsInstance(state, SessionState)
+
+
+class ReplaySnapshotsForSessionsTest(unittest.TestCase):
+    def test_empty_inputs_return_empty_tuple(self):
+        self.assertEqual(replay_snapshots_for_sessions([], []), ())
+
+    def test_paired_snapshots_move_each_session_differently(self):
+        sessions = [CareSession(), CareSession()]
+
+        result = replay_snapshots_for_sessions(
+            sessions,
+            [
+                SignalSnapshot(rear_door=DoorState.OPEN, timestamp=0.0),
+                SignalSnapshot(
+                    rear_seat_belt_buckled=True, timestamp=10.0
+                ),
+            ],
+        )
+
+        self.assertEqual(
+            result, (SessionState.BOARDING, SessionState.ONBOARD)
+        )
+        self.assertEqual(result, (sessions[0].state, sessions[1].state))
+        self.assertFalse(sessions[0].passenger_present)
+        self.assertTrue(sessions[1].passenger_present)
+
+    def test_paired_snapshots_on_prepared_sessions(self):
+        sessions = [CareSession(), CareSession()]
+        for session in sessions:
+            replay(session, dropoff_normal_snapshots()[:4])
+            self.assertEqual(session.state, SessionState.ARRIVED)
+
+        result = replay_snapshots_for_sessions(
+            sessions,
+            [
+                SignalSnapshot(
+                    rear_seat_belt_buckled=True,
+                    lock=LockState.LOCKED,
+                    cabin_temp_c=35.5,
+                    timestamp=240.0,
+                ),
+                SignalSnapshot(
+                    rear_door=DoorState.OPEN, timestamp=240.0
+                ),
+            ],
+        )
+
+        self.assertEqual(
+            result, (SessionState.EXCEPTION, SessionState.ALIGHTING)
+        )
+        self.assertTrue(sessions[0].passenger_present)
+        self.assertEqual(sessions[0].current_snapshot.cabin_temp_c, 35.5)
+
+    def test_length_mismatch_raises_and_leaves_sessions_unchanged(self):
+        sessions = [CareSession(), CareSession()]
+        snapshot = SignalSnapshot(rear_door=DoorState.OPEN)
+
+        with self.assertRaises(ValueError):
+            replay_snapshots_for_sessions(sessions, [snapshot])
+        with self.assertRaises(ValueError):
+            replay_snapshots_for_sessions(
+                sessions[:1], [snapshot, snapshot]
+            )
+
+        for session in sessions:
+            self.assertEqual(session.state, SessionState.IDLE)
+            self.assertEqual(session.history, [])
+
+    def test_generator_inputs_match_list_inputs(self):
+        list_sessions = [CareSession(), CareSession()]
+        generator_sessions = [CareSession(), CareSession()]
+        snapshots = [
+            SignalSnapshot(rear_door=DoorState.OPEN, timestamp=0.0),
+            SignalSnapshot(rear_seat_belt_buckled=True, timestamp=10.0),
+        ]
+
+        list_result = replay_snapshots_for_sessions(
+            list_sessions, snapshots
+        )
+        generator_result = replay_snapshots_for_sessions(
+            (session for session in generator_sessions),
+            (snapshot for snapshot in snapshots),
+        )
+
+        self.assertEqual(generator_result, list_result)
+        self.assertEqual(
+            [session.state for session in generator_sessions],
+            [session.state for session in list_sessions],
+        )
+
+    def test_returns_tuple_of_session_states_matching_each_session(self):
+        sessions = [CareSession(), CareSession(), CareSession()]
+        snapshots = [
+            SignalSnapshot(rear_door=DoorState.OPEN, timestamp=0.0),
+            SignalSnapshot(rear_door=DoorState.OPEN, timestamp=0.0),
+            SignalSnapshot(rear_seat_belt_buckled=True, timestamp=0.0),
+        ]
+
+        result = replay_snapshots_for_sessions(sessions, snapshots)
+
+        self.assertIsInstance(result, tuple)
+        self.assertEqual(len(result), 3)
+        for state, session in zip(result, sessions):
+            self.assertIsInstance(state, SessionState)
+            self.assertEqual(state, session.state)
+        # 중복 스냅샷은 중복 그대로 적용된다.
+        self.assertEqual(
+            result,
+            (
+                SessionState.BOARDING,
+                SessionState.BOARDING,
+                SessionState.ONBOARD,
+            ),
+        )
 
 
 if __name__ == "__main__":

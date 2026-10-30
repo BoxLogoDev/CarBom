@@ -31,6 +31,7 @@ __all__ = [
     "replay_scenarios_by_start",
     "replay_scenarios_by_name_and_start",
     "replay_snapshot_for_sessions",
+    "replay_snapshots_for_sessions",
     "replay_snapshot_sequence_for_sessions",
     "replay_snapshot_sequences_for_sessions",
     "scenario_snapshots",
@@ -361,6 +362,39 @@ def replay_snapshot_for_sessions(
     빈 sessions이면 빈 tuple이다. 중복 세션은 중복 그대로 유지한다.
     """
     return tuple(session.apply_snapshot(snapshot) for session in sessions)
+
+
+def replay_snapshots_for_sessions(
+    sessions: Iterable[CareSession],
+    snapshots: Iterable[SignalSnapshot],
+) -> tuple[SessionState, ...]:
+    """세션마다 다른 스냅샷 1건을 짝지어 적용하고 최종 상태들을 돌려준다.
+
+    sessions와 snapshots를 입력 순서대로 짝지어, 각 세션에 대응하는
+    스냅샷 1건을 CareSession.apply_snapshot으로 적용하고 반환된
+    SessionState들을 tuple로 묶는다.
+    replay_snapshot_for_sessions(같은 스냅샷 1건을 모든 세션에 적용)의
+    짝 버전으로, 세션마다 다른 스냅샷을 적용하는 경로다.
+    sessions와 snapshots를 먼저 각각 tuple로 구체화하므로 제너레이터
+    입력도 리스트 입력과 같게 동작한다.
+    빈 입력(둘 다 빈 경우)이면 빈 tuple이다. 중복은 중복 그대로 유지한다.
+
+    Raises:
+        ValueError: sessions와 snapshots의 길이가 다르면 낸다.
+            길이 검사가 모든 적용보다 먼저 끝나므로
+            어떤 세션도 변경되지 않는다.
+    """
+    sessions_tuple = tuple(sessions)
+    snapshots_tuple = tuple(snapshots)
+    if len(sessions_tuple) != len(snapshots_tuple):
+        raise ValueError(
+            "세션 수와 스냅샷 수가 다릅니다: "
+            f"{len(sessions_tuple)} != {len(snapshots_tuple)}"
+        )
+    return tuple(
+        session.apply_snapshot(snapshot)
+        for session, snapshot in zip(sessions_tuple, snapshots_tuple)
+    )
 
 
 def replay_snapshot_sequences_for_sessions(
