@@ -217,5 +217,148 @@ class CareSessionTest(unittest.TestCase):
         self.assertEqual(session.current_snapshot.cabin_temp_c, 28.0)
 
 
+def normal_flow_events():
+    types = [
+        SignalEventType.REAR_DOOR_OPENED,
+        SignalEventType.REAR_BELT_BUCKLED,
+        SignalEventType.REAR_DOOR_CLOSED,
+        SignalEventType.IGNITION_ON,
+        SignalEventType.IGNITION_OFF,
+        SignalEventType.REAR_DOOR_OPENED,
+        SignalEventType.REAR_BELT_UNBUCKLED,
+        SignalEventType.REAR_DOOR_CLOSED,
+    ]
+    return [
+        SignalEvent(event_type, timestamp=float(index * 10))
+        for index, event_type in enumerate(types)
+    ]
+
+
+def history_sequence(session):
+    return [
+        (t.from_state, t.to_state, t.reason, t.timestamp)
+        for t in session.history
+    ]
+
+
+class ApplyEventsAndUpdatesTest(unittest.TestCase):
+    def test_apply_events_empty_input_keeps_session(self):
+        session = CareSession()
+
+        result = session.apply_events([])
+
+        self.assertEqual(result, SessionState.IDLE)
+        self.assertEqual(session.state, SessionState.IDLE)
+        self.assertEqual(session.history, [])
+
+    def test_apply_events_drives_normal_flow_to_completed(self):
+        session = CareSession()
+
+        result = session.apply_events(normal_flow_events())
+
+        self.assertEqual(result, SessionState.COMPLETED)
+        self.assertEqual(result, session.state)
+        self.assertEqual(len(session.history), 6)
+        self.assertFalse(session.passenger_present)
+
+    def test_apply_events_lock_enters_exception(self):
+        session = CareSession()
+        prefix = [
+            SignalEvent(SignalEventType.REAR_DOOR_OPENED, timestamp=0.0),
+            SignalEvent(SignalEventType.REAR_BELT_BUCKLED, timestamp=10.0),
+            SignalEvent(SignalEventType.REAR_DOOR_CLOSED, timestamp=20.0),
+            SignalEvent(SignalEventType.IGNITION_ON, timestamp=30.0),
+            SignalEvent(SignalEventType.IGNITION_OFF, timestamp=40.0),
+        ]
+        session.apply_events(prefix)
+        self.assertEqual(session.state, SessionState.ARRIVED)
+
+        result = session.apply_events(
+            [SignalEvent(SignalEventType.LOCKED, timestamp=50.0)]
+        )
+
+        self.assertEqual(result, SessionState.EXCEPTION)
+        self.assertEqual(session.state, SessionState.EXCEPTION)
+        self.assertTrue(session.passenger_present)
+        self.assertTrue(session.current_snapshot.locked)
+
+    def test_apply_updates_empty_input_keeps_session(self):
+        session = CareSession()
+
+        result = session.apply_updates([])
+
+        self.assertEqual(result, SessionState.IDLE)
+        self.assertEqual(session.state, SessionState.IDLE)
+        self.assertEqual(session.history, [])
+
+    def test_apply_updates_matches_individual_calls(self):
+        items = [
+            snapshot(rear_door=DoorState.OPEN, timestamp=0.0),
+            SignalEvent(SignalEventType.REAR_BELT_BUCKLED, timestamp=10.0),
+            SignalEvent(SignalEventType.REAR_DOOR_CLOSED, timestamp=20.0),
+            snapshot(
+                rear_seat_belt_buckled=True,
+                ignition=IgnitionState.ON,
+                timestamp=30.0,
+            ),
+            SignalEvent(SignalEventType.IGNITION_OFF, timestamp=40.0),
+            snapshot(rear_door=DoorState.OPEN, timestamp=50.0),
+            SignalEvent(SignalEventType.REAR_DOOR_CLOSED, timestamp=60.0),
+        ]
+        bulk = CareSession()
+        individual = CareSession()
+
+        bulk_result = bulk.apply_updates(items)
+        individual_result = None
+        for item in items:
+            if isinstance(item, SignalEvent):
+                individual_result = individual.apply_event(item)
+            else:
+                individual_result = individual.apply_snapshot(item)
+
+        self.assertEqual(bulk_result, SessionState.COMPLETED)
+        self.assertEqual(bulk_result, individual_result)
+        self.assertEqual(bulk.state, individual.state)
+        self.assertEqual(bulk.passenger_present, individual.passenger_present)
+        self.assertEqual(
+            history_sequence(bulk), history_sequence(individual)
+        )
+
+    def test_apply_bulk_accepts_generators(self):
+        listed = CareSession()
+        generated = CareSession()
+
+        listed_result = listed.apply_events(normal_flow_events())
+        generated_result = generated.apply_events(
+            event for event in normal_flow_events()
+        )
+
+        self.assertEqual(generated_result, listed_result)
+        self.assertEqual(generated.state, SessionState.COMPLETED)
+        self.assertEqual(
+            history_sequence(generated), history_sequence(listed)
+        )
+
+        mixed = [
+            snapshot(rear_door=DoorState.OPEN, timestamp=0.0),
+            SignalEvent(SignalEventType.REAR_BELT_BUCKLED, timestamp=10.0),
+            SignalEvent(SignalEventType.REAR_DOOR_CLOSED, timestamp=20.0),
+        ]
+        listed_mixed = CareSession()
+        generated_mixed = CareSession()
+
+        listed_mixed_result = listed_mixed.apply_updates(mixed)
+        generated_mixed_result = generated_mixed.apply_updates(
+            item for item in mixed
+        )
+
+        self.assertEqual(generated_mixed_result, listed_mixed_result)
+        self.assertEqual(generated_mixed.state, SessionState.ONBOARD)
+        self.assertEqual(
+            history_sequence(generated_mixed),
+            history_sequence(listed_mixed),
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

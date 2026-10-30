@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 from enum import Enum
 
@@ -66,6 +67,7 @@ class CareSession:
 
     호출자는 apply_snapshot 이나 apply_event 로 신호를 순서대로 넘긴다.
     update 는 두 입력을 모두 받는 편의 메서드다.
+    apply_events 와 apply_updates 는 여러 건을 순서대로 넘기는 대량 메서드다.
     호출자는 state 와 passenger_present 와 history 를 읽어 결과를 확인한다.
     """
 
@@ -120,6 +122,31 @@ class CareSession:
             return self.apply_snapshot(snapshot)
         snapshot = self._snapshot_from_event(event)
         return self.apply_snapshot(snapshot)
+
+    def apply_events(self, events: Iterable[SignalEvent]) -> SessionState:
+        """신호 이벤트를 순서대로 반영하고 최종 상태를 돌려준다.
+
+        빈 입력이면 세션을 바꾸지 않고 현재 상태를 돌려준다.
+        제너레이터 입력도 한 번의 순회로 동작한다.
+        """
+        state = self._state
+        for event in events:
+            state = self.apply_event(event)
+        return state
+
+    def apply_updates(
+        self, items: Iterable[SignalSnapshot | SignalEvent]
+    ) -> SessionState:
+        """스냅샷과 이벤트를 섞어 순서대로 반영하고 최종 상태를 돌려준다.
+
+        각 항목은 기존 update 로 적용한다.
+        빈 입력이면 세션을 바꾸지 않고 현재 상태를 돌려준다.
+        제너레이터 입력도 한 번의 순회로 동작한다.
+        """
+        state = self._state
+        for item in items:
+            state = self.update(item)
+        return state
 
     def _snapshot_from_event(self, event: SignalEvent) -> SignalSnapshot:
         current = self._snapshot
