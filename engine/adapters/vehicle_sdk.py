@@ -31,6 +31,7 @@ __all__ = [
     "poll_repeatedly_into_sessions",
     "poll_repeatedly_into_sessions_by_times",
     "poll_snapshots",
+    "poll_snapshots_by_times",
     "raw_from_snapshot",
     "raws_from_snapshots",
     "snapshot_from_raw",
@@ -391,3 +392,43 @@ def poll_snapshots(
     if times < 0:
         raise ValueError(f"times는 0 이상이어야 한다: {times}")
     return tuple(adapter.poll() for _ in range(times))
+
+
+def poll_snapshots_by_times(
+    adapter: VehicleSdkAdapter, times_list: Iterable[int]
+) -> tuple[tuple[SignalSnapshot, ...], ...]:
+    """신호를 항목마다 다른 횟수만큼 읽어 스냅샷 시퀀스들을 돌려준다.
+
+    poll_snapshots의 짝 버전이며 poll_repeatedly_into_sessions_by_times가
+    내부에서 먼저 모으는 스냅샷 슬라이스를 읽기 전용으로 분리한 헬퍼이다.
+    세션에는 전혀 관여하지 않는다.
+    times_list를 먼저 tuple로 구체화한다. 어느 times라도 음수이면
+    poll()을 한 번도 호출하지 않고 ValueError를 내며, 이 검사는 미연결
+    어댑터에서도 먼저 적용된다. 빈 입력이면 빈 tuple을 돌려주고 poll()을
+    호출하지 않으며, 모든 times가 0이면 poll()을 호출하지 않고 0인
+    개수만큼 빈 tuple들을 돌려주므로, 클라이언트 미연결 어댑터에서도
+    예외가 나지 않는다. 그 외에는 adapter.poll()을 정확히
+    sum(times_list)번만 호출해 모든 스냅샷을 먼저 모은 뒤, 짝 순서대로
+    각 times 몫의 슬라이스를 tuple로 묶어 돌려준다. times가 0인 항목은
+    빈 tuple이다.
+
+    Raises:
+        ValueError: 어느 times라도 음수이면 낸다. poll()을 호출하지
+            않는다.
+        NotImplementedError: SDK 클라이언트가 연결되지 않았고 양수인
+            times가 있으면 첫 poll()에서 낸다.
+    """
+    materialized_times = tuple(times_list)
+    for times in materialized_times:
+        if times < 0:
+            raise ValueError(f"times는 0 이상이어야 한다: {times}")
+    total = sum(materialized_times)
+    if total == 0:
+        return tuple(() for _ in materialized_times)
+    snapshots = tuple(adapter.poll() for _ in range(total))
+    sequences: list[tuple[SignalSnapshot, ...]] = []
+    offset = 0
+    for times in materialized_times:
+        sequences.append(snapshots[offset : offset + times])
+        offset += times
+    return tuple(sequences)
