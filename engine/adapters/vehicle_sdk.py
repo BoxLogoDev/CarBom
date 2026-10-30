@@ -29,6 +29,7 @@ __all__ = [
     "apply_raw_sequences_for_sessions",
     "poll_into_sessions",
     "poll_repeatedly_into_sessions",
+    "poll_repeatedly_into_sessions_by_times",
     "poll_snapshots",
     "raw_from_snapshot",
     "raws_from_snapshots",
@@ -312,6 +313,60 @@ def poll_repeatedly_into_sessions(
         for snapshot in snapshots:
             state = session.apply_snapshot(snapshot)
         states.append(state)
+    return tuple(states)
+
+
+def poll_repeatedly_into_sessions_by_times(
+    adapter: VehicleSdkAdapter,
+    sessions: Iterable[CareSession],
+    times_list: Iterable[int],
+) -> tuple[SessionState, ...]:
+    """신호를 세션마다 다른 횟수만큼 읽어 각 세션에 적용하고 상태들을 돌려준다.
+
+    poll_repeatedly_into_sessions의 짝 버전이다. sessions와 times_list를
+    먼저 각각 tuple로 구체화하고, 입력 순서대로 짝지어 각 세션에
+    자기 몫의 횟수만큼 poll한 스냅샷들을 적용한다.
+    스냅샷은 적용 전에 poll()을 총합(sum(times_list))번 호출해 짝 순서대로
+    모두 먼저 모으므로, 모든 세션이 연속된 poll 스트림에서 자기 몫의
+    슬라이스를 순서대로 받고, poll 횟수는 세션 수가 아니라 횟수의
+    총합과 같다.
+    times가 0인 세션은 변경하지 않고 현재 상태를 돌려준다. sessions가
+    비어 있거나 모든 times가 0이면 poll()을 한 번도 호출하지 않으므로,
+    클라이언트 미연결 어댑터에서도 예외가 나지 않는다(빈 sessions이면
+    빈 tuple).
+
+    Raises:
+        ValueError: sessions와 times_list의 길이가 다르면 낸다.
+            poll()을 호출하지 않고 어떤 세션도 변경하지 않는다.
+        ValueError: 어느 times라도 음수이면 낸다. 길이 검사가 먼저
+            적용되고, poll()을 호출하지 않고 어떤 세션도 변경하지
+            않는다.
+        NotImplementedError: SDK 클라이언트가 연결되지 않았고 양수인
+            times가 있으면 첫 poll()에서 낸다. 스냅샷을 모두 모은 뒤에
+            적용하므로 어떤 세션도 변경되지 않는다.
+    """
+    materialized_sessions = tuple(sessions)
+    materialized_times = tuple(times_list)
+    if len(materialized_sessions) != len(materialized_times):
+        raise ValueError(
+            "세션 수와 반복 횟수 수가 다릅니다: "
+            f"{len(materialized_sessions)} != {len(materialized_times)}"
+        )
+    for times in materialized_times:
+        if times < 0:
+            raise ValueError(f"times는 0 이상이어야 한다: {times}")
+    total = sum(materialized_times)
+    if total == 0:
+        return tuple(session.state for session in materialized_sessions)
+    snapshots = tuple(adapter.poll() for _ in range(total))
+    states: list[SessionState] = []
+    offset = 0
+    for session, times in zip(materialized_sessions, materialized_times):
+        state = session.state
+        for snapshot in snapshots[offset : offset + times]:
+            state = session.apply_snapshot(snapshot)
+        states.append(state)
+        offset += times
     return tuple(states)
 
 
