@@ -12,6 +12,10 @@ from engine import (
     SignalEventType,
     SignalSnapshot,
 )
+from engine.adapters.simulator import (
+    dropoff_normal_snapshots,
+    forgotten_rising_temp_snapshots,
+)
 
 
 def snapshot(**overrides):
@@ -357,6 +361,82 @@ class ApplyEventsAndUpdatesTest(unittest.TestCase):
         self.assertEqual(
             history_sequence(generated_mixed),
             history_sequence(listed_mixed),
+        )
+
+
+class ApplySnapshotsTest(unittest.TestCase):
+    def test_apply_snapshots_empty_input_keeps_idle_session(self):
+        session = CareSession()
+
+        result = session.apply_snapshots([])
+
+        self.assertEqual(result, SessionState.IDLE)
+        self.assertEqual(session.state, SessionState.IDLE)
+        self.assertEqual(session.history, [])
+        self.assertFalse(session.passenger_present)
+
+    def test_apply_snapshots_empty_input_keeps_intermediate_state(self):
+        session = CareSession()
+        session.apply_snapshot(dropoff_normal_snapshots()[0])
+        self.assertEqual(session.state, SessionState.BOARDING)
+
+        result = session.apply_snapshots([])
+
+        self.assertEqual(result, SessionState.BOARDING)
+        self.assertEqual(session.state, SessionState.BOARDING)
+        self.assertEqual(len(session.history), 1)
+
+    def test_apply_snapshots_drives_normal_flow_to_completed(self):
+        session = CareSession()
+
+        result = session.apply_snapshots(dropoff_normal_snapshots())
+
+        self.assertEqual(result, SessionState.COMPLETED)
+        self.assertEqual(result, session.state)
+        self.assertEqual(len(session.history), 6)
+        self.assertFalse(session.passenger_present)
+
+    def test_apply_snapshots_forgotten_flow_enters_exception(self):
+        session = CareSession()
+
+        result = session.apply_snapshots(forgotten_rising_temp_snapshots())
+
+        self.assertEqual(result, SessionState.EXCEPTION)
+        self.assertEqual(session.state, SessionState.EXCEPTION)
+        self.assertTrue(session.passenger_present)
+        self.assertEqual(session.current_snapshot.cabin_temp_c, 35.5)
+
+    def test_apply_snapshots_accepts_generator(self):
+        listed = CareSession()
+        generated = CareSession()
+
+        listed_result = listed.apply_snapshots(dropoff_normal_snapshots())
+        generated_result = generated.apply_snapshots(
+            snap for snap in dropoff_normal_snapshots()
+        )
+
+        self.assertEqual(generated_result, listed_result)
+        self.assertEqual(generated.state, SessionState.COMPLETED)
+        self.assertEqual(
+            history_sequence(generated), history_sequence(listed)
+        )
+
+    def test_apply_snapshots_matches_individual_calls(self):
+        bulk = CareSession()
+        individual = CareSession()
+        snapshots = forgotten_rising_temp_snapshots()
+
+        bulk_result = bulk.apply_snapshots(snapshots)
+        individual_result = None
+        for snap in snapshots:
+            individual_result = individual.apply_snapshot(snap)
+
+        self.assertEqual(bulk_result, SessionState.EXCEPTION)
+        self.assertEqual(bulk_result, individual_result)
+        self.assertEqual(bulk.state, individual.state)
+        self.assertEqual(bulk.passenger_present, individual.passenger_present)
+        self.assertEqual(
+            history_sequence(bulk), history_sequence(individual)
         )
 
 

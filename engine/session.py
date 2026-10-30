@@ -67,7 +67,7 @@ class CareSession:
 
     호출자는 apply_snapshot 이나 apply_event 로 신호를 순서대로 넘긴다.
     update 는 두 입력을 모두 받는 편의 메서드다.
-    apply_events 와 apply_updates 는 여러 건을 순서대로 넘기는 대량 메서드다.
+    apply_snapshots 와 apply_events 와 apply_updates 는 여러 건을 순서대로 넘기는 대량 메서드다.
     호출자는 state 와 passenger_present 와 history 를 읽어 결과를 확인한다.
     """
 
@@ -112,6 +112,19 @@ class CareSession:
         self._update_passenger(snapshot)
         self._advance(snapshot.timestamp)
         return self._state
+
+    def apply_snapshots(
+        self, snapshots: Iterable[SignalSnapshot]
+    ) -> SessionState:
+        """신호 스냅샷을 순서대로 반영하고 최종 상태를 돌려준다.
+
+        빈 입력이면 세션을 바꾸지 않고 현재 상태를 돌려준다.
+        제너레이터 입력도 한 번의 순회로 동작한다.
+        """
+        state = self._state
+        for snapshot in snapshots:
+            state = self.apply_snapshot(snapshot)
+        return state
 
     def apply_event(self, event: SignalEvent) -> SessionState:
         """신호 이벤트 한 건을 반영하고 현재 상태를 돌려준다."""
