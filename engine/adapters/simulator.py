@@ -30,6 +30,7 @@ __all__ = [
     "replay_scenarios_by_name",
     "replay_scenarios_by_start",
     "replay_scenarios_by_name_and_start",
+    "replay_snapshot_for_sessions",
     "replay_snapshot_sequence_for_sessions",
     "replay_snapshot_sequences_for_sessions",
     "scenario_snapshots",
@@ -342,6 +343,24 @@ def replay_scenarios_by_name_and_start(
         replay(session, snapshots)
         for session, snapshots in zip(sessions_tuple, snapshots_list)
     )
+
+
+def replay_snapshot_for_sessions(
+    sessions: Iterable[CareSession],
+    snapshot: SignalSnapshot,
+) -> tuple[SessionState, ...]:
+    """여러 세션에 같은 스냅샷 1건을 적용하고 최종 상태들을 돌려준다.
+
+    sessions를 입력 순서대로 읽어 각 세션에 같은 snapshot 객체 1건을
+    CareSession.apply_snapshot으로 적용하고 반환된 SessionState들을
+    tuple로 묶는다. Vehicle SDK 쪽 apply_raw_for_sessions(단일 raw를
+    딱 한 번 변환해 여러 세션에 적용)와 poll_into_sessions(단일 poll
+    스냅샷을 여러 세션에 적용)의 시뮬레이터 쪽 짝이며,
+    replay_snapshot_sequence_for_sessions(단일 시퀀스를 모든 세션에
+    재생)와 달리 스냅샷 1건을 모든 세션에 적용하는 경로다.
+    빈 sessions이면 빈 tuple이다. 중복 세션은 중복 그대로 유지한다.
+    """
+    return tuple(session.apply_snapshot(snapshot) for session in sessions)
 
 
 def replay_snapshot_sequences_for_sessions(

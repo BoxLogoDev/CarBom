@@ -2,7 +2,13 @@
 
 import unittest
 
-from engine import CareSession, SessionState
+from engine import (
+    CareSession,
+    DoorState,
+    LockState,
+    SessionState,
+    SignalSnapshot,
+)
 from engine.adapters import (
     SCENARIO_NAMES,
     dropoff_normal_snapshots,
@@ -14,6 +20,7 @@ from engine.adapters import (
     replay_scenarios_by_name,
     replay_scenarios_by_name_and_start,
     replay_scenarios_by_start,
+    replay_snapshot_for_sessions,
     replay_snapshot_sequence_for_sessions,
     replay_snapshot_sequences_for_sessions,
     scenario_snapshots,
@@ -756,6 +763,94 @@ class ReplaySnapshotSequenceForSessionsTest(unittest.TestCase):
             [session.state for session in generator_sessions],
             [session.state for session in list_sessions],
         )
+
+
+class ReplaySnapshotForSessionsTest(unittest.TestCase):
+    def test_empty_sessions_returns_empty_tuple(self):
+        self.assertEqual(
+            replay_snapshot_for_sessions(
+                [], SignalSnapshot(rear_door=DoorState.OPEN)
+            ),
+            (),
+        )
+
+    def test_rear_door_open_moves_both_sessions_to_boarding(self):
+        sessions = [CareSession(), CareSession()]
+
+        result = replay_snapshot_for_sessions(
+            sessions, dropoff_normal_snapshots()[0]
+        )
+
+        self.assertEqual(
+            result, (SessionState.BOARDING, SessionState.BOARDING)
+        )
+        self.assertEqual(result, (sessions[0].state, sessions[1].state))
+
+    def test_locked_with_passenger_moves_prepared_sessions_to_exception(self):
+        sessions = [CareSession(), CareSession()]
+        for session in sessions:
+            replay(session, dropoff_normal_snapshots()[:4])
+            self.assertEqual(session.state, SessionState.ARRIVED)
+
+        result = replay_snapshot_for_sessions(
+            sessions,
+            SignalSnapshot(
+                rear_seat_belt_buckled=True,
+                lock=LockState.LOCKED,
+                cabin_temp_c=35.5,
+                timestamp=240.0,
+            ),
+        )
+
+        self.assertEqual(
+            result, (SessionState.EXCEPTION, SessionState.EXCEPTION)
+        )
+        for session in sessions:
+            self.assertTrue(session.passenger_present)
+            self.assertEqual(session.current_snapshot.cabin_temp_c, 35.5)
+
+    def test_same_snapshot_is_shared_by_all_sessions(self):
+        sessions = [CareSession(), CareSession()]
+        snapshot = SignalSnapshot(
+            rear_door=DoorState.OPEN, timestamp=50.0
+        )
+
+        replay_snapshot_for_sessions(sessions, snapshot)
+
+        for session in sessions:
+            self.assertIs(session.current_snapshot, snapshot)
+        self.assertIs(
+            sessions[0].current_snapshot, sessions[1].current_snapshot
+        )
+        self.assertEqual(sessions[0].current_snapshot.timestamp, 50.0)
+
+    def test_generator_sessions_match_list_sessions(self):
+        list_sessions = [CareSession(), CareSession()]
+        generator_sessions = [CareSession(), CareSession()]
+        snapshot = dropoff_normal_snapshots()[0]
+
+        list_result = replay_snapshot_for_sessions(list_sessions, snapshot)
+        generator_result = replay_snapshot_for_sessions(
+            (session for session in generator_sessions), snapshot
+        )
+
+        self.assertEqual(generator_result, list_result)
+        self.assertEqual(
+            [session.state for session in generator_sessions],
+            [session.state for session in list_sessions],
+        )
+
+    def test_returns_tuple_of_session_states(self):
+        sessions = [CareSession(), CareSession()]
+
+        result = replay_snapshot_for_sessions(
+            sessions, dropoff_normal_snapshots()[0]
+        )
+
+        self.assertIsInstance(result, tuple)
+        self.assertEqual(len(result), 2)
+        for state in result:
+            self.assertIsInstance(state, SessionState)
 
 
 if __name__ == "__main__":
