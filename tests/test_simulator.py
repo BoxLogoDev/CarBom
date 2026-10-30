@@ -14,6 +14,7 @@ from engine.adapters import (
     replay_scenarios_by_name,
     replay_scenarios_by_name_and_start,
     replay_scenarios_by_start,
+    replay_snapshot_sequence_for_sessions,
     replay_snapshot_sequences_for_sessions,
     scenario_snapshots,
     snapshots_for_scenarios,
@@ -667,6 +668,89 @@ class ReplaySnapshotSequencesForSessionsTest(unittest.TestCase):
             (tuple(snapshot for snapshot in seq) for seq in sequences),
         )
 
+        self.assertEqual(generator_result, list_result)
+        self.assertEqual(
+            [session.state for session in generator_sessions],
+            [session.state for session in list_sessions],
+        )
+
+
+class ReplaySnapshotSequenceForSessionsTest(unittest.TestCase):
+    def test_empty_sessions_returns_empty_tuple(self):
+        self.assertEqual(
+            replay_snapshot_sequence_for_sessions(
+                [], dropoff_normal_snapshots()
+            ),
+            (),
+        )
+
+    def test_empty_snapshots_leave_sessions_untouched(self):
+        sessions = [CareSession(), CareSession()]
+
+        result = replay_snapshot_sequence_for_sessions(sessions, [])
+
+        self.assertEqual(
+            result, (SessionState.IDLE, SessionState.IDLE)
+        )
+        for session in sessions:
+            self.assertEqual(session.state, SessionState.IDLE)
+            self.assertEqual(session.history, [])
+
+    def test_same_sequence_applied_to_all_sessions_completed(self):
+        sessions = [CareSession(), CareSession()]
+
+        result = replay_snapshot_sequence_for_sessions(
+            sessions, dropoff_normal_snapshots()
+        )
+
+        self.assertEqual(
+            result, (SessionState.COMPLETED, SessionState.COMPLETED)
+        )
+        for state, session in zip(result, sessions):
+            self.assertEqual(state, session.state)
+            self.assertFalse(session.passenger_present)
+
+    def test_same_sequence_applied_to_all_sessions_exception(self):
+        sessions = [CareSession(), CareSession()]
+
+        result = replay_snapshot_sequence_for_sessions(
+            sessions, forgotten_rising_temp_snapshots()
+        )
+
+        self.assertEqual(
+            result, (SessionState.EXCEPTION, SessionState.EXCEPTION)
+        )
+        for session in sessions:
+            self.assertTrue(session.passenger_present)
+            self.assertEqual(session.current_snapshot.cabin_temp_c, 35.5)
+
+    def test_generator_snapshots_reused_across_sessions(self):
+        sessions = [CareSession(), CareSession()]
+
+        result = replay_snapshot_sequence_for_sessions(
+            sessions,
+            (snapshot for snapshot in dropoff_normal_snapshots()),
+        )
+
+        self.assertEqual(
+            result, (SessionState.COMPLETED, SessionState.COMPLETED)
+        )
+        for session in sessions:
+            self.assertEqual(len(session.history), 6)
+
+    def test_generator_sessions_match_list_sessions(self):
+        list_sessions = [CareSession(), CareSession()]
+        generator_sessions = [CareSession(), CareSession()]
+
+        list_result = replay_snapshot_sequence_for_sessions(
+            list_sessions, pet_dropoff_snapshots()
+        )
+        generator_result = replay_snapshot_sequence_for_sessions(
+            (session for session in generator_sessions),
+            pet_dropoff_snapshots(),
+        )
+
+        self.assertIsInstance(generator_result, tuple)
         self.assertEqual(generator_result, list_result)
         self.assertEqual(
             [session.state for session in generator_sessions],
