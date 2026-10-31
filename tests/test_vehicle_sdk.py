@@ -24,6 +24,7 @@ from engine.adapters import (
     poll_repeatedly_paired_into_sessions,
     poll_snapshots,
     poll_snapshots_by_times,
+    poll_snapshots_paired,
     raw_from_snapshot,
     raws_from_snapshots,
     snapshot_from_raw,
@@ -1309,6 +1310,124 @@ class PollSnapshotsByTimesTest(unittest.TestCase):
     def test_without_client_positive_times_fails(self):
         with self.assertRaises(NotImplementedError):
             poll_snapshots_by_times(VehicleSdkAdapter(), [0, 3])
+
+
+class PollSnapshotsPairedTest(unittest.TestCase):
+    def test_empty_and_zero_inputs_return_empty_without_client(self):
+        self.assertEqual(poll_snapshots_paired([], []), ())
+        self.assertEqual(
+            poll_snapshots_paired([VehicleSdkAdapter()], [0]), ((),)
+        )
+
+    def test_paired_adapters_read_different_slices(self):
+        normal_client = FakeSequenceSdkClient(
+            raws_from_snapshots(scenario_snapshots("dropoff_normal"))
+        )
+        forgotten_client = FakeSequenceSdkClient(
+            raws_from_snapshots(
+                scenario_snapshots("forgotten_rising_temp")
+            )
+        )
+        result = poll_snapshots_paired(
+            [
+                VehicleSdkAdapter(normal_client),
+                VehicleSdkAdapter(forgotten_client),
+            ],
+            [6, 8],
+        )
+        self.assertEqual(normal_client.calls, 6)
+        self.assertEqual(forgotten_client.calls, 8)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0], dropoff_normal_snapshots())
+        self.assertEqual(result[0][-1].timestamp, 300.0)
+        self.assertEqual(result[1], forgotten_rising_temp_snapshots())
+        self.assertEqual(result[1][-1].cabin_temp_c, 35.5)
+        self.assertEqual(result[1][-1].lock, LockState.LOCKED)
+        self.assertTrue(result[1][-1].rear_seat_belt_buckled)
+
+    def test_zero_times_skip_matching_adapter(self):
+        normal_client = FakeSequenceSdkClient(
+            raws_from_snapshots(scenario_snapshots("dropoff_normal"))
+        )
+        pet_client = FakeSequenceSdkClient(
+            raws_from_snapshots(scenario_snapshots("pet_dropoff"))
+        )
+        result = poll_snapshots_paired(
+            [
+                VehicleSdkAdapter(normal_client),
+                VehicleSdkAdapter(),
+                VehicleSdkAdapter(pet_client),
+            ],
+            [6, 0, 6],
+        )
+        self.assertEqual(normal_client.calls, 6)
+        self.assertEqual(pet_client.calls, 6)
+        self.assertEqual(result[0], dropoff_normal_snapshots())
+        self.assertEqual(result[1], ())
+        self.assertEqual(result[2], scenario_snapshots("pet_dropoff"))
+
+    def test_length_mismatch_raises_without_polling(self):
+        for adapter_count, times_count in ((1, 2), (2, 1)):
+            with self.subTest(
+                adapter_count=adapter_count, times_count=times_count
+            ):
+                clients = [
+                    FakeSequenceSdkClient(
+                        raws_from_snapshots(
+                            scenario_snapshots("dropoff_normal")
+                        )
+                    )
+                    for _ in range(adapter_count)
+                ]
+                adapters = [VehicleSdkAdapter(c) for c in clients]
+                with self.assertRaises(ValueError):
+                    poll_snapshots_paired(
+                        adapters, [6] * times_count
+                    )
+                for client in clients:
+                    self.assertEqual(client.calls, 0)
+
+    def test_negative_times_raises_without_polling(self):
+        clients = [
+            FakeSequenceSdkClient(
+                raws_from_snapshots(scenario_snapshots("dropoff_normal"))
+            )
+            for _ in range(2)
+        ]
+        adapters = [VehicleSdkAdapter(c) for c in clients]
+        with self.assertRaises(ValueError):
+            poll_snapshots_paired(adapters, [6, -1])
+        for client in clients:
+            self.assertEqual(client.calls, 0)
+        with self.assertRaises(ValueError):
+            poll_snapshots_paired([VehicleSdkAdapter()], [-1])
+
+    def test_generator_inputs_and_duplicate_adapter(self):
+        raws = raws_from_snapshots(scenario_snapshots("dropoff_normal"))
+        expected_client = FakeSequenceSdkClient(raws)
+        expected = poll_snapshots_paired(
+            [VehicleSdkAdapter(expected_client)], [6]
+        )
+        actual_client = FakeSequenceSdkClient(raws)
+        actual = poll_snapshots_paired(
+            iter([VehicleSdkAdapter(actual_client)]), iter([6])
+        )
+        self.assertEqual(actual, expected)
+        self.assertEqual(actual_client.calls, 6)
+        self.assertIsInstance(actual, tuple)
+        for sequence in actual:
+            self.assertIsInstance(sequence, tuple)
+            for snapshot in sequence:
+                self.assertIsInstance(snapshot, SignalSnapshot)
+
+        shared_client = FakeSequenceSdkClient(raws)
+        shared_adapter = VehicleSdkAdapter(shared_client)
+        result = poll_snapshots_paired(
+            [shared_adapter, shared_adapter], [3, 3]
+        )
+        self.assertEqual(shared_client.calls, 6)
+        self.assertEqual(result[0], dropoff_normal_snapshots()[:3])
+        self.assertEqual(result[1], dropoff_normal_snapshots()[3:])
 
 
 if __name__ == "__main__":

@@ -36,6 +36,7 @@ __all__ = [
     "poll_repeatedly_paired_into_sessions",
     "poll_snapshots",
     "poll_snapshots_by_times",
+    "poll_snapshots_paired",
     "raw_from_snapshot",
     "raws_from_snapshots",
     "snapshot_from_raw",
@@ -586,3 +587,48 @@ def poll_snapshots_by_times(
         sequences.append(snapshots[offset : offset + times])
         offset += times
     return tuple(sequences)
+
+
+def poll_snapshots_paired(
+    adapters: Iterable[VehicleSdkAdapter],
+    times_list: Iterable[int],
+) -> tuple[tuple[SignalSnapshot, ...], ...]:
+    """어댑터마다 다른 횟수만큼 읽어 스냅샷 시퀀스들을 돌려준다.
+
+    poll_snapshots_by_times(단일 어댑터, 짝 times)의 어댑터 짝 버전이며
+    poll_repeatedly_paired_into_sessions가 내부에서 모으는 어댑터별
+    스냅샷 슬라이스를 읽기 전용으로 분리한 헬퍼이다.
+    세션에는 전혀 관여하지 않는다.
+    adapters와 times_list를 먼저 각각 tuple로 구체화하므로
+    제너레이터 입력도 리스트 입력과 같게 동작한다. 중복 어댑터는
+    등장할 때마다 따로 poll한다.
+    times가 0인 항목은 빈 tuple이며 그 어댑터는 poll하지 않으므로,
+    클라이언트 미연결 어댑터에서도 예외가 나지 않는다. 빈 입력이면
+    빈 tuple을 돌려준다.
+
+    Raises:
+        ValueError: adapters와 times_list의 길이가 다르면 낸다.
+            길이 검사가 모든 poll보다 먼저 끝나므로 어떤 어댑터의
+            poll도 호출되지 않는다.
+        ValueError: 어느 times라도 음수이면 낸다. 길이 검사 다음에
+            적용되므로 poll()을 호출하지 않으며, 미연결 어댑터에서도
+            이 검사가 먼저 적용된다.
+        NotImplementedError: 어느 어댑터라도 연결되지 않았고 그
+            어댑터의 times가 양수이면 그 어댑터의 첫 poll()에서 낸다.
+            어댑터 순서대로 poll하므로 앞선 어댑터들의 poll은 이미
+            일어났을 수 있으나, 세션은 없으므로 상태 변경은 없다.
+    """
+    adapters_tuple = tuple(adapters)
+    times_tuple = tuple(times_list)
+    if len(adapters_tuple) != len(times_tuple):
+        raise ValueError(
+            "어댑터 수와 반복 횟수 수가 다릅니다: "
+            f"{len(adapters_tuple)} != {len(times_tuple)}"
+        )
+    for times in times_tuple:
+        if times < 0:
+            raise ValueError(f"times는 0 이상이어야 한다: {times}")
+    return tuple(
+        tuple(adapter.poll() for _ in range(times))
+        for adapter, times in zip(adapters_tuple, times_tuple)
+    )
