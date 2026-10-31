@@ -33,6 +33,7 @@ __all__ = [
     "poll_paired_into_sessions",
     "poll_repeatedly_into_sessions",
     "poll_repeatedly_into_sessions_by_times",
+    "poll_repeatedly_paired_into_sessions",
     "poll_snapshots",
     "poll_snapshots_by_times",
     "raw_from_snapshot",
@@ -458,6 +459,69 @@ def poll_repeatedly_into_sessions_by_times(
             state = session.apply_snapshot(snapshot)
         states.append(state)
         offset += times
+    return tuple(states)
+
+
+def poll_repeatedly_paired_into_sessions(
+    adapters: Iterable[VehicleSdkAdapter],
+    sessions: Iterable[CareSession],
+    times_list: Iterable[int],
+) -> tuple[SessionState, ...]:
+    """어댑터마다 다른 횟수만큼 읽어 짝지어진 세션에 적용하고 상태들을 돌려준다.
+
+    poll_paired_into_sessions(어댑터마다 1회 poll)의 반복 버전이며
+    poll_repeatedly_into_sessions_by_times(단일 어댑터, 짝 times)의
+    어댑터 짝 버전이다. adapters·sessions·times_list를 입력 순서대로
+    짝지어, 각 어댑터를 자기 times만큼 poll한 스냅샷들을 대응 세션에
+    적용한다.
+    세 입력은 먼저 각각 tuple로 구체화하므로 제너레이터 입력도
+    리스트 입력과 같게 동작한다. 중복은 중복 그대로 유지하고,
+    중복된 어댑터는 등장할 때마다 따로 poll한다.
+    스냅샷은 적용 전에 어댑터 순서대로 모두 먼저 모으므로, 수집 중
+    어느 poll이라도 실패하면 어떤 세션도 변경되지 않는다.
+    times가 0인 세션은 변경하지 않고 현재 상태를 돌려준다. 모든
+    times 합이 0이면 poll()을 한 번도 호출하지 않으므로, 클라이언트
+    미연결 어댑터에서도 예외가 나지 않는다(빈 입력이면 빈 tuple).
+
+    Raises:
+        ValueError: adapters·sessions·times_list의 길이가 모두
+            같지 않으면 낸다. 길이 검사가 모든 poll보다 먼저
+            끝나므로 어떤 어댑터의 poll도 호출되지 않고 어떤
+            세션도 변경되지 않는다.
+        ValueError: 어느 times라도 음수이면 낸다. 길이 검사가 먼저
+            적용되고, poll()을 호출하지 않고 어떤 세션도 변경하지
+            않는다.
+        NotImplementedError: 어느 어댑터라도 연결되지 않았고 그
+            어댑터의 times가 양수이면 수집 단계의 poll()에서 낸다.
+            스냅샷을 모두 모은 뒤에 적용하므로 어떤 세션도
+            변경되지 않는다.
+    """
+    adapters_tuple = tuple(adapters)
+    sessions_tuple = tuple(sessions)
+    times_tuple = tuple(times_list)
+    if not (
+        len(adapters_tuple) == len(sessions_tuple) == len(times_tuple)
+    ):
+        raise ValueError(
+            "어댑터 수·세션 수·반복 횟수 수가 다릅니다: "
+            f"{len(adapters_tuple)} != {len(sessions_tuple)} "
+            f"!= {len(times_tuple)}"
+        )
+    for times in times_tuple:
+        if times < 0:
+            raise ValueError(f"times는 0 이상이어야 한다: {times}")
+    if sum(times_tuple) == 0:
+        return tuple(session.state for session in sessions_tuple)
+    slices = tuple(
+        tuple(adapter.poll() for _ in range(times))
+        for adapter, times in zip(adapters_tuple, times_tuple)
+    )
+    states: list[SessionState] = []
+    for session, slice_snapshots in zip(sessions_tuple, slices):
+        state = session.state
+        for snapshot in slice_snapshots:
+            state = session.apply_snapshot(snapshot)
+        states.append(state)
     return tuple(states)
 
 
