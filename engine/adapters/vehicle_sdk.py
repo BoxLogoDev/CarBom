@@ -30,6 +30,7 @@ __all__ = [
     "apply_raws_for_sessions",
     "apply_raw_sequences_for_sessions",
     "poll_into_sessions",
+    "poll_paired_into_sessions",
     "poll_repeatedly_into_sessions",
     "poll_repeatedly_into_sessions_by_times",
     "poll_snapshots",
@@ -325,6 +326,42 @@ def poll_into_sessions(
         return ()
     snapshot = adapter.poll()
     return tuple(session.apply_snapshot(snapshot) for session in materialized)
+
+
+def poll_paired_into_sessions(
+    adapters: Iterable[VehicleSdkAdapter],
+    sessions: Iterable[CareSession],
+) -> tuple[SessionState, ...]:
+    """어댑터마다 한 번씩 읽어 짝지어진 세션에 적용하고 상태들을 돌려준다.
+
+    adapters와 sessions를 입력 순서대로 짝지어, 각 어댑터의
+    poll_into를 대응하는 세션에 적용하고 반환된 SessionState들을
+    tuple로 묶는다.
+    apply_raws_paired_for_sessions(세션마다 다른 raw 1건을 적용)의
+    poll 쪽 짝으로, 세션마다 다른 어댑터(다른 차량 신호원)를 읽는
+    경로이며, poll_into_sessions(한 어댑터의 스냅샷 1건을 모든
+    세션에 적용)와 달리 어댑터마다 poll이 따로 일어난다.
+    adapters와 sessions를 먼저 각각 tuple로 구체화하므로
+    제너레이터 입력도 리스트 입력과 같게 동작한다.
+    빈 입력(둘 다 빈 경우)이면 poll을 한 번도 호출하지 않고
+    빈 tuple이다. 중복은 중복 그대로 유지한다.
+
+    Raises:
+        ValueError: adapters와 sessions의 길이가 다르면 낸다.
+            길이 검사가 모든 poll보다 먼저 끝나므로 어떤 어댑터의
+            poll도 호출되지 않고 어떤 세션도 변경되지 않는다.
+    """
+    adapters_tuple = tuple(adapters)
+    sessions_tuple = tuple(sessions)
+    if len(adapters_tuple) != len(sessions_tuple):
+        raise ValueError(
+            "어댑터 수와 세션 수가 다릅니다: "
+            f"{len(adapters_tuple)} != {len(sessions_tuple)}"
+        )
+    return tuple(
+        adapter.poll_into(session)
+        for adapter, session in zip(adapters_tuple, sessions_tuple)
+    )
 
 
 def poll_repeatedly_into_sessions(

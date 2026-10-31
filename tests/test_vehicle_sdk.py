@@ -18,6 +18,7 @@ from engine.adapters import (
     dropoff_normal_snapshots,
     forgotten_rising_temp_snapshots,
     poll_into_sessions,
+    poll_paired_into_sessions,
     poll_repeatedly_into_sessions,
     poll_repeatedly_into_sessions_by_times,
     poll_snapshots,
@@ -742,6 +743,125 @@ class PollIntoSessionsTest(unittest.TestCase):
         poll_into_sessions(adapter, sessions)
         for session in sessions:
             self.assertEqual(session.current_snapshot.cabin_temp_c, 35.5)
+
+
+class PollPairedIntoSessionsTest(unittest.TestCase):
+    def test_empty_inputs_give_empty_tuple(self):
+        self.assertEqual(poll_paired_into_sessions([], []), ())
+
+    def test_paired_adapters_poll_into_matching_sessions(self):
+        door_client = FakeSdkClient({"rear_door_open": True})
+        drive_client = FakeSdkClient(
+            {"rear_seat_belt_buckled": True, "ignition_on": True}
+        )
+        adapters = [
+            VehicleSdkAdapter(door_client),
+            VehicleSdkAdapter(drive_client),
+        ]
+        sessions = [CareSession(), CareSession()]
+        states = poll_paired_into_sessions(adapters, sessions)
+        self.assertEqual(
+            states, (SessionState.BOARDING, SessionState.DRIVING)
+        )
+        self.assertEqual(
+            states, (sessions[0].state, sessions[1].state)
+        )
+        self.assertEqual(door_client.calls, 1)
+        self.assertEqual(drive_client.calls, 1)
+
+    def test_paired_polls_exception_and_alighting(self):
+        sessions = [CareSession(), CareSession()]
+        for session in sessions:
+            apply_raw(session, {"rear_door_open": True})
+            apply_raw(session, {"rear_seat_belt_buckled": True})
+            apply_raw(
+                session,
+                {"rear_seat_belt_buckled": True, "ignition_on": True},
+            )
+            apply_raw(session, {"rear_seat_belt_buckled": True})
+            self.assertEqual(session.state, SessionState.ARRIVED)
+        adapters = [
+            VehicleSdkAdapter(
+                FakeSdkClient(
+                    {
+                        "rear_seat_belt_buckled": True,
+                        "locked": True,
+                        "cabin_temp_c": 35.5,
+                    }
+                )
+            ),
+            VehicleSdkAdapter(FakeSdkClient({"rear_door_open": True})),
+        ]
+        states = poll_paired_into_sessions(adapters, sessions)
+        self.assertEqual(
+            states, (SessionState.EXCEPTION, SessionState.ALIGHTING)
+        )
+        self.assertTrue(sessions[0].passenger_present)
+        self.assertEqual(sessions[0].current_snapshot.cabin_temp_c, 35.5)
+
+    def test_length_mismatch_raises_without_polling_or_changing(self):
+        for adapters_count, sessions_count in ((2, 1), (1, 2)):
+            with self.subTest(
+                adapters_count=adapters_count,
+                sessions_count=sessions_count,
+            ):
+                clients = [
+                    FakeSdkClient({"rear_door_open": True})
+                    for _ in range(adapters_count)
+                ]
+                adapters = [VehicleSdkAdapter(c) for c in clients]
+                sessions = [
+                    CareSession() for _ in range(sessions_count)
+                ]
+                with self.assertRaises(ValueError):
+                    poll_paired_into_sessions(adapters, sessions)
+                for client in clients:
+                    self.assertEqual(client.calls, 0)
+                for session in sessions:
+                    self.assertEqual(session.state, SessionState.IDLE)
+                    self.assertEqual(session.history, [])
+
+    def test_generator_inputs_match_list_input(self):
+        def make_adapters():
+            return [
+                VehicleSdkAdapter(
+                    FakeSdkClient({"rear_door_open": True})
+                ),
+                VehicleSdkAdapter(
+                    FakeSdkClient({"rear_seat_belt_buckled": True})
+                ),
+            ]
+
+        list_sessions = [CareSession(), CareSession()]
+        generator_sessions = [CareSession(), CareSession()]
+        list_states = poll_paired_into_sessions(
+            make_adapters(), list_sessions
+        )
+        generator_states = poll_paired_into_sessions(
+            iter(make_adapters()), iter(generator_sessions)
+        )
+        self.assertEqual(generator_states, list_states)
+        self.assertEqual(
+            [session.state for session in generator_sessions],
+            [session.state for session in list_sessions],
+        )
+
+    def test_returns_tuple_of_session_states_and_keeps_duplicates(self):
+        client = FakeSdkClient({"rear_door_open": True})
+        adapter = VehicleSdkAdapter(client)
+        session = CareSession()
+        states = poll_paired_into_sessions(
+            [adapter, adapter], [session, session]
+        )
+        self.assertIsInstance(states, tuple)
+        self.assertEqual(len(states), 2)
+        for state in states:
+            self.assertIsInstance(state, SessionState)
+        self.assertEqual(
+            states, (SessionState.BOARDING, SessionState.BOARDING)
+        )
+        self.assertEqual(states[-1], session.state)
+        self.assertEqual(client.calls, 2)
 
 
 class PollRepeatedlyIntoTest(unittest.TestCase):
