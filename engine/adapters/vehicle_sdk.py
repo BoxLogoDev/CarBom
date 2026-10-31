@@ -31,6 +31,7 @@ __all__ = [
     "apply_raw_sequences_for_sessions",
     "poll_into_sessions",
     "poll_paired_into_sessions",
+    "poll_repeatedly_for_adapters_into_sessions",
     "poll_repeatedly_into_sessions",
     "poll_repeatedly_into_sessions_by_times",
     "poll_repeatedly_paired_into_sessions",
@@ -525,6 +526,56 @@ def poll_repeatedly_paired_into_sessions(
             state = session.apply_snapshot(snapshot)
         states.append(state)
     return tuple(states)
+
+
+def poll_repeatedly_for_adapters_into_sessions(
+    adapters: Iterable[VehicleSdkAdapter],
+    sessions: Iterable[CareSession],
+    times: int,
+) -> tuple[SessionState, ...]:
+    """여러 어댑터를 같은 횟수만큼 읽어 짝지어진 세션에 적용하고 상태들을 돌려준다.
+
+    poll_repeatedly_paired_into_sessions(어댑터마다 다른 횟수)의
+    균일 횟수 버전이며 poll_snapshots_for_adapters(균일 횟수 읽기)의
+    적용 쪽 짝이다. adapters·sessions를 입력 순서대로 짝지어, 각
+    어댑터를 times번 poll한 스냅샷들을 대응 세션에 적용한다.
+    두 입력은 먼저 각각 tuple로 구체화하므로 제너레이터 입력도
+    리스트 입력과 같게 동작한다. 중복은 중복 그대로 유지하고,
+    중복된 어댑터는 등장할 때마다 따로 poll한다.
+    스냅샷은 적용 전에 어댑터 순서대로 모두 먼저 모으므로
+    (poll_repeatedly_paired_into_sessions에 위임), 수집 중 어느
+    poll이라도 실패하면 어떤 세션도 변경되지 않는다.
+    times가 0이면 poll()을 한 번도 호출하지 않고 각 세션의 현재
+    상태를 돌려주므로, 클라이언트 미연결 어댑터에서도 예외가
+    나지 않는다(빈 입력이면 빈 tuple).
+
+    Raises:
+        ValueError: times가 음수이면 낸다. adapters·sessions가
+            비어 있어도 이 검사가 길이 검사보다 먼저 적용되므로
+            poll()을 호출하지 않고 어떤 세션도 변경되지 않으며,
+            미연결 어댑터에서도 이 검사가 먼저 적용된다.
+        ValueError: adapters와 sessions의 길이가 다르면 낸다.
+            어떤 어댑터의 poll도 호출되지 않고 어떤 세션도
+            변경되지 않는다.
+        NotImplementedError: 어느 어댑터라도 연결되지 않았고
+            times가 양수이면 수집 단계의 poll()에서 낸다.
+            스냅샷을 모두 모은 뒤에 적용하므로 어떤 세션도
+            변경되지 않는다.
+    """
+    if times < 0:
+        raise ValueError(f"times는 0 이상이어야 한다: {times}")
+    adapters_tuple = tuple(adapters)
+    sessions_tuple = tuple(sessions)
+    if len(adapters_tuple) != len(sessions_tuple):
+        raise ValueError(
+            "어댑터 수와 세션 수가 다릅니다: "
+            f"{len(adapters_tuple)} != {len(sessions_tuple)}"
+        )
+    return poll_repeatedly_paired_into_sessions(
+        adapters_tuple,
+        sessions_tuple,
+        (times,) * len(adapters_tuple),
+    )
 
 
 def poll_snapshots(
