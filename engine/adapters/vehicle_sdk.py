@@ -26,6 +26,7 @@ __all__ = [
     "apply_raw",
     "apply_raw_for_sessions",
     "apply_raws",
+    "apply_raws_paired_for_sessions",
     "apply_raws_for_sessions",
     "apply_raw_sequences_for_sessions",
     "poll_into_sessions",
@@ -149,6 +150,40 @@ def apply_raws(
     for raw in raws:
         state = apply_raw(session, raw)
     return state
+
+
+def apply_raws_paired_for_sessions(
+    sessions: Iterable[CareSession],
+    raws: Iterable[Mapping[str, Any]],
+) -> tuple[SessionState, ...]:
+    """세션마다 다른 원시 신호 dict 1건을 짝지어 적용하고 상태들을 돌려준다.
+
+    sessions와 raws를 입력 순서대로 짝지어, 각 세션에 대응하는 raw 1건을
+    apply_raw로 적용하고 반환된 SessionState들을 tuple로 묶는다.
+    apply_raw_for_sessions(같은 raw 1건을 모든 세션에 적용)의 짝 버전으로,
+    세션마다 다른 raw를 적용하는 경로이며, simulator의
+    replay_snapshots_for_sessions(세션마다 다른 스냅샷 1건을 적용)와
+    짝을 이룬다.
+    sessions와 raws를 먼저 각각 tuple로 구체화하므로 제너레이터 입력도
+    리스트 입력과 같게 동작한다.
+    빈 입력(둘 다 빈 경우)이면 빈 tuple이다. 중복은 중복 그대로 유지한다.
+
+    Raises:
+        ValueError: sessions와 raws의 길이가 다르면 낸다.
+            길이 검사가 모든 적용보다 먼저 끝나므로
+            어떤 세션도 변경되지 않는다.
+    """
+    sessions_tuple = tuple(sessions)
+    raws_tuple = tuple(raws)
+    if len(sessions_tuple) != len(raws_tuple):
+        raise ValueError(
+            "세션 수와 원시 신호 수가 다릅니다: "
+            f"{len(sessions_tuple)} != {len(raws_tuple)}"
+        )
+    return tuple(
+        apply_raw(session, raw)
+        for session, raw in zip(sessions_tuple, raws_tuple)
+    )
 
 
 def apply_raws_for_sessions(
