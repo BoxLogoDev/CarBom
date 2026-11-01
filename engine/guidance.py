@@ -8,6 +8,7 @@
 대량 헬퍼는 세션들을 입력 순서대로 읽어 안내들을 돌려주며,
 세션을 바꾸지 않는다.
 짝 헬퍼는 세션마다 다른 목적지 맥락을 짝지어 안내들을 돌려준다.
+단일 세션 헬퍼는 세션 하나에 목적지 맥락 여럿을 적용해 안내들을 돌려준다.
 """
 
 from __future__ import annotations
@@ -275,12 +276,37 @@ def guidances_for_sessions_by_context(
     )
 
 
+def guidances_for_session_by_contexts(
+    session: CareSession,
+    contexts: Iterable[DestinationContext | str | None],
+) -> tuple[Guidance, ...]:
+    """세션 하나에 목적지 맥락 여럿을 적용해 안내들을 돌려준다. 세션은 바꾸지 않는다.
+
+    guidances_for_sessions(같은 맥락을 모든 세션에 적용)와
+    guidances_for_sessions_by_context(세션마다 다른 맥락을 짝지어 적용)와
+    짝을 이루는, 세션 하나에 맥락 여럿을 적용하는 경로다.
+    simulator의 snapshots_for_scenario_by_starts(하나의 이름·여러 시작
+    시각)와 같은 단일 기준 × 다중 파라미터 대칭이다.
+    contexts를 먼저 tuple로 구체화하고, 입력 순서대로 각 원소에
+    guidance_for_session(session, context=원소)를 적용한 tuple을 돌려준다.
+    빈 입력이면 빈 tuple이다. 중복은 중복 그대로 유지하고, 각 context는
+    Enum·문자열·None을 그대로 전달한다(정규화는 guidance_for_session
+    경로가 담당한다).
+    """
+    contexts_tuple = tuple(contexts)
+    return tuple(
+        guidance_for_session(session, context=context)
+        for context in contexts_tuple
+    )
+
+
 __all__ = [
     "DestinationContext",
     "Guidance",
     "GuidanceLevel",
     "guidance_for",
     "guidance_for_session",
+    "guidances_for_session_by_contexts",
     "guidances_for_sessions",
     "guidances_for_sessions_by_context",
 ]

@@ -6,6 +6,7 @@ from engine.guidance import (
     GuidanceLevel,
     guidance_for,
     guidance_for_session,
+    guidances_for_session_by_contexts,
     guidances_for_sessions,
     guidances_for_sessions_by_context,
 )
@@ -57,6 +58,7 @@ __all__ = [
     "all_profiles",
     "guidance_for",
     "guidance_for_session",
+    "guidances_for_session_by_contexts",
     "guidances_for_sessions",
     "guidances_for_sessions_by_context",
     "needs_manual_confirmation",

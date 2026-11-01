@@ -6,6 +6,7 @@ from engine import (
     CareSession,
     DestinationContext,
     DoorState,
+    Guidance,
     GuidanceLevel,
     IgnitionState,
     LockState,
@@ -13,6 +14,7 @@ from engine import (
     SignalSnapshot,
     guidance_for,
     guidance_for_session,
+    guidances_for_session_by_contexts,
     guidances_for_sessions,
     guidances_for_sessions_by_context,
 )
@@ -391,6 +393,122 @@ class GuidancesForSessionsByContextTest(unittest.TestCase):
             for s in sessions
         ]
         self.assertEqual(after, before)
+
+
+class GuidancesForSessionByContextsTest(unittest.TestCase):
+    def _arrived_session(self):
+        session = CareSession()
+        board_drive_and_arrive(session)
+        self.assertEqual(session.state, SessionState.ARRIVED)
+        return session
+
+    def _boarding_session(self):
+        session = CareSession()
+        session.apply_snapshot(snapshot(rear_door=DoorState.OPEN))
+        self.assertEqual(session.state, SessionState.BOARDING)
+        return session
+
+    def test_empty_contexts_returns_empty_tuple(self):
+        arrived = self._arrived_session()
+        self.assertEqual(guidances_for_session_by_contexts(arrived, []), ())
+        self.assertEqual(
+            guidances_for_session_by_contexts(arrived, iter(())), ()
+        )
+
+    def test_contexts_differ_and_match_individual_calls(self):
+        arrived = self._arrived_session()
+        contexts = [
+            DestinationContext.GENERAL,
+            DestinationContext.DROPOFF,
+            DestinationContext.PICKUP,
+        ]
+
+        result = guidances_for_session_by_contexts(arrived, contexts)
+
+        self.assertEqual(len(result), 3)
+        for actual, context in zip(result, contexts):
+            self.assertEqual(
+                actual,
+                guidance_for_session(arrived, context=context),
+            )
+            self.assertEqual(actual.level, GuidanceLevel.REMIND)
+            self.assertEqual(actual.state, SessionState.ARRIVED)
+        self.assertEqual(len({g.text for g in result}), 3)
+        self.assertEqual(len({g.reason for g in result}), 3)
+        self.assertIn("등원", result[1].text)
+        self.assertIn("하원", result[2].text)
+
+    def test_session_is_not_mutated(self):
+        arrived = self._arrived_session()
+        before = (
+            arrived.state,
+            len(arrived.history),
+            arrived.current_snapshot,
+            arrived.passenger_present,
+        )
+
+        guidances_for_session_by_contexts(
+            arrived,
+            [DestinationContext.DROPOFF, DestinationContext.PICKUP],
+        )
+
+        after = (
+            arrived.state,
+            len(arrived.history),
+            arrived.current_snapshot,
+            arrived.passenger_present,
+        )
+        self.assertEqual(after, before)
+
+    def test_generator_input_matches_list_input(self):
+        arrived = self._arrived_session()
+        contexts = [DestinationContext.DROPOFF, DestinationContext.PICKUP]
+
+        from_list = guidances_for_session_by_contexts(arrived, contexts)
+        from_generator = guidances_for_session_by_contexts(
+            arrived, (c for c in contexts)
+        )
+
+        self.assertEqual(from_generator, from_list)
+
+    def test_string_and_none_contexts_match_individual_calls(self):
+        arrived = self._arrived_session()
+        contexts = ["dropoff", " DROPOFF ", None, "unknown"]
+
+        result = guidances_for_session_by_contexts(arrived, contexts)
+
+        self.assertEqual(
+            result,
+            tuple(
+                guidance_for_session(arrived, context=c) for c in contexts
+            ),
+        )
+        self.assertEqual(result[0], result[1])
+        self.assertEqual(
+            result[2],
+            guidance_for_session(arrived, context=DestinationContext.GENERAL),
+        )
+        self.assertEqual(result[3], result[2])
+
+    def test_duplicates_preserved_and_returns_tuple_of_guidance(self):
+        boarding = self._boarding_session()
+
+        result = guidances_for_session_by_contexts(
+            boarding,
+            [DestinationContext.DROPOFF, DestinationContext.DROPOFF],
+        )
+
+        self.assertIsInstance(result, tuple)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0], result[1])
+        for guidance in result:
+            self.assertIsInstance(guidance, Guidance)
+        self.assertEqual(
+            result[0],
+            guidance_for_session(
+                boarding, context=DestinationContext.DROPOFF
+            ),
+        )
 
 
 if __name__ == "__main__":
