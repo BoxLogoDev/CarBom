@@ -35,6 +35,7 @@ __all__ = [
     "poll_repeatedly_into_sessions",
     "poll_repeatedly_into_sessions_by_times",
     "poll_repeatedly_paired_into_sessions",
+    "poll_snapshot",
     "poll_snapshots",
     "poll_snapshots_by_times",
     "poll_snapshots_for_adapters",
@@ -576,6 +577,21 @@ def poll_repeatedly_for_adapters_into_sessions(
         sessions_tuple,
         (times,) * len(adapters_tuple),
     )
+
+
+def poll_snapshot(adapter: VehicleSdkAdapter) -> SignalSnapshot:
+    """신호를 한 번 읽어 스냅샷 1건만 돌려준다(세션에 적용하지 않는다).
+
+    poll_snapshots(adapter, 1)의 단건 기본형이며, poll_into_sessions가
+    여러 세션에 적용하기 전에 먼저 읽는 스냅샷 1건을 읽기 전용으로
+    분리한 헬퍼이다. adapter.poll()을 정확히 1회 호출하고, 얻은
+    SignalSnapshot을 그대로 돌려준다. 세션에는 전혀 관여하지 않는다.
+
+    Raises:
+        NotImplementedError: SDK 클라이언트가 연결되지 않았으면
+            poll()에서 낸다.
+    """
+    return adapter.poll()
 
 
 def poll_snapshots(

@@ -23,6 +23,7 @@ from engine.adapters import (
     poll_repeatedly_into_sessions_by_times,
     poll_repeatedly_paired_into_sessions,
     poll_repeatedly_for_adapters_into_sessions,
+    poll_snapshot,
     poll_snapshots,
     poll_snapshots_by_times,
     poll_snapshots_for_adapters,
@@ -1195,6 +1196,66 @@ class PollRepeatedlyPairedIntoSessionsTest(unittest.TestCase):
         for session in sessions:
             self.assertEqual(session.state, SessionState.IDLE)
             self.assertEqual(session.history, [])
+
+
+class PollSnapshotTest(unittest.TestCase):
+    def test_polls_exactly_once_and_returns_full_snapshot(self):
+        client = FakeSdkClient(FULL_RAW)
+        snap = poll_snapshot(VehicleSdkAdapter(client))
+        self.assertEqual(client.calls, 1)
+        self.assertEqual(snap, snapshot_from_raw(FULL_RAW))
+        self.assertEqual(snap.rear_door, DoorState.OPEN)
+        self.assertTrue(snap.rear_seat_belt_buckled)
+        self.assertEqual(snap.ignition, IgnitionState.ON)
+        self.assertTrue(snap.locked)
+        self.assertTrue(snap.hvac_on)
+        self.assertEqual(snap.cabin_temp_c, 33.5)
+        self.assertEqual(snap.timestamp, 1234.5)
+
+    def test_matches_single_element_of_poll_snapshots(self):
+        raws = raws_from_snapshots(scenario_snapshots("dropoff_normal"))
+        single = poll_snapshot(
+            VehicleSdkAdapter(FakeSequenceSdkClient(list(raws)))
+        )
+        client = FakeSequenceSdkClient(list(raws))
+        plural = poll_snapshots(VehicleSdkAdapter(client), 1)
+        self.assertIsInstance(single, SignalSnapshot)
+        self.assertEqual(plural, (single,))
+        self.assertEqual(client.calls, 1)
+
+    def test_without_client_fails(self):
+        with self.assertRaises(NotImplementedError):
+            poll_snapshot(VehicleSdkAdapter())
+
+    def test_read_only_leaves_existing_session_untouched(self):
+        session = CareSession()
+        session.apply_snapshot(
+            SignalSnapshot(rear_door=DoorState.OPEN, timestamp=0.0)
+        )
+        state_before = session.state
+        history_before = list(session.history)
+        snapshot_before = session.current_snapshot
+        poll_snapshot(VehicleSdkAdapter(FakeSdkClient(FULL_RAW)))
+        self.assertEqual(session.state, state_before)
+        self.assertEqual(session.history, history_before)
+        self.assertEqual(session.current_snapshot, snapshot_before)
+
+    def test_sequence_client_advances_in_order(self):
+        raws = raws_from_snapshots(scenario_snapshots("dropoff_normal"))
+        client = FakeSequenceSdkClient(list(raws))
+        adapter = VehicleSdkAdapter(client)
+        first = poll_snapshot(adapter)
+        second = poll_snapshot(adapter)
+        expected = dropoff_normal_snapshots()
+        self.assertEqual(first, expected[0])
+        self.assertEqual(second, expected[1])
+        self.assertEqual(client.calls, 2)
+
+    def test_empty_raw_gives_default_snapshot(self):
+        client = FakeSdkClient({})
+        snap = poll_snapshot(VehicleSdkAdapter(client))
+        self.assertEqual(snap, SignalSnapshot())
+        self.assertEqual(client.calls, 1)
 
 
 class PollSnapshotsTest(unittest.TestCase):
