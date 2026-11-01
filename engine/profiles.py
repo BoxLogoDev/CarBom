@@ -12,6 +12,7 @@
 짝 헬퍼 needs_manual_confirmations_by_belt는 프로필마다 다른 벨트 상태를 짝지어 수동 확인 필요 여부 tuple을 돌려준다.
 종류 기반 짝 헬퍼 needs_manual_confirmations_for_kinds_by_belt는 종류 값마다 다른 벨트 상태를 짝지어 수동 확인 필요 여부 tuple을 돌려준다.
 단일 프로필 헬퍼 needs_manual_confirmations_for_profile_by_belts는 프로필 하나에 벨트 상태 여럿을 적용해 수동 확인 필요 여부 tuple을 돌려준다.
+종류 기반 단일 종류 헬퍼 needs_manual_confirmations_for_kind_by_belts는 종류 값 하나에 벨트 상태 여럿을 적용해 수동 확인 필요 여부 tuple을 돌려준다.
 """
 
 from __future__ import annotations
@@ -248,6 +249,28 @@ def needs_manual_confirmations_for_profile_by_belts(
     )
 
 
+def needs_manual_confirmations_for_kind_by_belts(
+    kind: PassengerKind | str | None, belt_flags: Iterable[bool]
+) -> tuple[bool, ...]:
+    """종류 값 하나에 벨트 상태 여럿을 적용해 수동 탑승 확인이 필요한지 돌려준다.
+
+    needs_manual_confirmations_for_profile_by_belts(프로필 대상)의 종류
+    버전이며 needs_manual_confirmations_for_kinds(종류 여럿·벨트 상태
+    하나)와 대칭이다. belt_flags를 먼저 tuple로 구체화하고,
+    profile_for(kind)를 한 번 적용해 얻은 프로필에 입력 순서대로 각
+    원소에 needs_manual_confirmation(profile, belt_buckled=flag)를
+    적용한 tuple을 돌려준다. 빈 입력이면 빈 tuple이다.
+    중복은 중복 그대로 유지하고, 알 수 없는 값과 None은
+    profile_for의 기존 폴백(ADULT)을 그대로 따른다.
+    """
+    belt_flags_tuple = tuple(belt_flags)
+    profile = profile_for(kind)
+    return tuple(
+        needs_manual_confirmation(profile, belt_buckled=flag)
+        for flag in belt_flags_tuple
+    )
+
+
 __all__ = [
     "PassengerKind",
     "PassengerProfile",
@@ -256,6 +279,7 @@ __all__ = [
     "needs_manual_confirmations",
     "needs_manual_confirmations_by_belt",
     "needs_manual_confirmations_for_kinds",
+    "needs_manual_confirmations_for_kind_by_belts",
     "needs_manual_confirmations_for_kinds_by_belt",
     "needs_manual_confirmations_for_profile_by_belts",
     "profile_for",
