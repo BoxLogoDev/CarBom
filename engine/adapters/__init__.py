@@ -16,6 +16,7 @@ from engine.adapters.simulator import (
     replay_snapshot_sequence_for_sessions,
     replay_snapshot_sequences_for_sessions,
     scenario_snapshots,
+    snapshots_for_scenario_by_starts,
     snapshots_for_scenarios,
     snapshots_for_scenarios_by_start,
 )
@@ -79,6 +80,7 @@ __all__ = [
     "raw_from_snapshot",
     "scenario_snapshots",
     "snapshot_from_raw",
+    "snapshots_for_scenario_by_starts",
     "snapshots_for_scenarios",
     "snapshots_for_scenarios_by_start",
     "snapshots_from_raws",

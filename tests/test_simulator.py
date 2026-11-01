@@ -25,6 +25,7 @@ from engine.adapters import (
     replay_snapshot_sequence_for_sessions,
     replay_snapshot_sequences_for_sessions,
     scenario_snapshots,
+    snapshots_for_scenario_by_starts,
     snapshots_for_scenarios,
     snapshots_for_scenarios_by_start,
 )
@@ -238,6 +239,60 @@ class SnapshotsForScenariosByStartTest(unittest.TestCase):
 
     def test_returns_tuple_of_tuples(self):
         result = snapshots_for_scenarios_by_start(SCENARIO_NAMES, [0.0, 1.0, 2.0])
+
+        self.assertIsInstance(result, tuple)
+        for snapshots in result:
+            self.assertIsInstance(snapshots, tuple)
+
+
+class SnapshotsForScenarioByStartsTest(unittest.TestCase):
+    def test_empty_starts_returns_empty_tuple(self):
+        self.assertEqual(snapshots_for_scenario_by_starts("dropoff_normal", []), ())
+
+    def test_each_start_matches_individual_call_for_all_scenarios(self):
+        starts = (0.0, 1000.0, 2000.0)
+
+        for name in SCENARIO_NAMES:
+            result = snapshots_for_scenario_by_starts(name, starts)
+
+            self.assertEqual(len(result), len(starts))
+            for start, snapshots in zip(starts, result):
+                self.assertEqual(snapshots, scenario_snapshots(name, start))
+                self.assertEqual(snapshots[0].timestamp, start)
+
+    def test_duplicate_starts_are_kept(self):
+        result = snapshots_for_scenario_by_starts(
+            "pet_dropoff", [500.0, 500.0]
+        )
+
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0], result[1])
+        self.assertEqual(result[0][0].timestamp, 500.0)
+
+    def test_generator_input_matches_list_input(self):
+        result = snapshots_for_scenario_by_starts(
+            "forgotten_rising_temp", (start for start in [100.0, 200.0])
+        )
+
+        self.assertEqual(
+            result,
+            snapshots_for_scenario_by_starts(
+                "forgotten_rising_temp", [100.0, 200.0]
+            ),
+        )
+
+    def test_unknown_name_raises_only_when_starts_not_empty(self):
+        with self.assertRaises(ValueError):
+            snapshots_for_scenario_by_starts("unknown_scenario", [0.0])
+
+        self.assertEqual(
+            snapshots_for_scenario_by_starts("unknown_scenario", []), ()
+        )
+
+    def test_returns_tuple_of_tuples(self):
+        result = snapshots_for_scenario_by_starts(
+            "dropoff_normal", [0.0, 1.0, 2.0]
+        )
 
         self.assertIsInstance(result, tuple)
         for snapshots in result:

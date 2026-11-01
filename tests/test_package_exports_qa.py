@@ -66,6 +66,7 @@ ADAPTER_SOURCES = {
     "replay_snapshot_sequence_for_sessions": simulator,
     "replay_snapshot_sequences_for_sessions": simulator,
     "scenario_snapshots": simulator,
+    "snapshots_for_scenario_by_starts": simulator,
     "snapshots_for_scenarios": simulator,
     "snapshots_for_scenarios_by_start": simulator,
     "VehicleSdkAdapter": vehicle_sdk,
@@ -249,6 +250,11 @@ class TestBulkHelperExports(unittest.TestCase):
         self.assertIs(
             adapters.snapshots_for_scenarios_by_start,
             simulator.snapshots_for_scenarios_by_start,
+        )
+        self.assertIn("snapshots_for_scenario_by_starts", adapters.__all__)
+        self.assertIs(
+            adapters.snapshots_for_scenario_by_starts,
+            simulator.snapshots_for_scenario_by_starts,
         )
         self.assertIn("poll_paired_into_sessions", adapters.__all__)
         self.assertIs(
