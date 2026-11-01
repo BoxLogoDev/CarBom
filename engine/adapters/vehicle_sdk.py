@@ -39,6 +39,7 @@ __all__ = [
     "poll_snapshots",
     "poll_snapshots_by_times",
     "poll_snapshots_for_adapters",
+    "poll_snapshots_once_per_adapter",
     "poll_snapshots_paired",
     "raw_from_snapshot",
     "raws_from_snapshots",
@@ -732,3 +733,29 @@ def poll_snapshots_for_adapters(
     return tuple(
         poll_snapshots(adapter, times) for adapter in adapters_tuple
     )
+
+
+def poll_snapshots_once_per_adapter(
+    adapters: Iterable[VehicleSdkAdapter],
+) -> tuple[SignalSnapshot, ...]:
+    """여러 어댑터를 각각 한 번씩 읽어 스냅샷들을 돌려준다.
+
+    poll_snapshot(단일 어댑터 단건 읽기)의 다중 어댑터 버전이며
+    poll_paired_into_sessions(어댑터마다 1회 poll해 세션에 적용)의
+    읽기 전용 flat 버전이다. 세션에는 전혀 관여하지 않는다.
+    adapters를 먼저 tuple로 구체화하므로 제너레이터 입력도 리스트
+    입력과 같게 동작한다. 입력 순서대로 각 어댑터를 정확히 1회
+    poll해 얻은 SignalSnapshot들을 flat한 tuple로 묶어 돌려준다.
+    poll_snapshots_for_adapters(adapters, 1)이 어댑터당 1개짜리
+    tuple들의 tuple을 돌려주는 것과 다르다. 빈 입력이면 빈 tuple을
+    돌려주고 어떤 어댑터도 poll하지 않는다. 중복 어댑터는 등장할
+    때마다 따로 poll한다.
+
+    Raises:
+        NotImplementedError: 어느 어댑터라도 연결되지 않았으면 그
+            어댑터의 첫 poll()에서 낸다. 어댑터 순서대로 poll하므로
+            앞선 어댑터들의 poll은 이미 일어났을 수 있으나, 세션은
+            없으므로 상태 변경은 없다.
+    """
+    adapters_tuple = tuple(adapters)
+    return tuple(poll_snapshot(adapter) for adapter in adapters_tuple)
