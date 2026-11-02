@@ -19,6 +19,7 @@ from engine.adapters import (
     forgotten_rising_temp_snapshots,
     poll_into_sessions,
     poll_once_per_adapter_into_session,
+    poll_once_per_adapter_into_sessions,
     poll_paired_into_sessions,
     poll_repeatedly_into_sessions,
     poll_repeatedly_into_sessions_by_times,
@@ -1938,6 +1939,89 @@ class PollOncePerAdapterIntoSessionTest(unittest.TestCase):
         self.assertIsInstance(result, SessionState)
         self.assertEqual(result, SessionState.BOARDING)
         self.assertEqual(len(session.history), 1)
+
+
+class PollOncePerAdapterIntoSessionsTest(unittest.TestCase):
+    def _adapters_for(self, scenario_name):
+        raws = raws_from_snapshots(scenario_snapshots(scenario_name))
+        clients = [FakeSdkClient(raw) for raw in raws]
+        adapters = [VehicleSdkAdapter(client) for client in clients]
+        return adapters, clients
+
+    def test_empty_sessions_polls_nothing_and_returns_empty_tuple(self):
+        adapters, clients = self._adapters_for("dropoff_normal")
+        result = poll_once_per_adapter_into_sessions(adapters, [])
+        self.assertEqual(result, ())
+        for client in clients:
+            self.assertEqual(client.calls, 0)
+
+    def test_empty_adapters_returns_current_states_unchanged(self):
+        sessions = [CareSession(), CareSession()]
+        result = poll_once_per_adapter_into_sessions([], sessions)
+        self.assertEqual(result, (SessionState.IDLE, SessionState.IDLE))
+        for session in sessions:
+            self.assertEqual(session.state, SessionState.IDLE)
+            self.assertEqual(session.history, [])
+
+    def test_dropoff_sequence_broadcasts_to_all_sessions(self):
+        adapters, clients = self._adapters_for("dropoff_normal")
+        sessions = [CareSession(), CareSession()]
+        result = poll_once_per_adapter_into_sessions(adapters, sessions)
+        self.assertEqual(
+            result, (SessionState.COMPLETED, SessionState.COMPLETED)
+        )
+        for session in sessions:
+            self.assertEqual(session.state, SessionState.COMPLETED)
+            self.assertEqual(len(session.history), 6)
+        for client in clients:
+            self.assertEqual(client.calls, 1)
+
+    def test_forgotten_sequence_broadcasts_exception_to_all_sessions(self):
+        adapters, clients = self._adapters_for("forgotten_rising_temp")
+        sessions = [CareSession(), CareSession()]
+        result = poll_once_per_adapter_into_sessions(adapters, sessions)
+        self.assertEqual(
+            result, (SessionState.EXCEPTION, SessionState.EXCEPTION)
+        )
+        for session in sessions:
+            self.assertTrue(session.passenger_present)
+            self.assertEqual(session.current_snapshot.cabin_temp_c, 35.5)
+            self.assertEqual(len(session.history), 5)
+        for client in clients:
+            self.assertEqual(client.calls, 1)
+
+    def test_unconnected_second_adapter_leaves_all_sessions_unchanged(self):
+        adapters, clients = self._adapters_for("dropoff_normal")
+        sessions = [CareSession(), CareSession()]
+        with self.assertRaises(NotImplementedError):
+            poll_once_per_adapter_into_sessions(
+                [adapters[0], VehicleSdkAdapter()], sessions
+            )
+        self.assertEqual(clients[0].calls, 1)
+        for session in sessions:
+            self.assertEqual(session.state, SessionState.IDLE)
+            self.assertEqual(session.history, [])
+
+    def test_generator_inputs_match_list_input(self):
+        adapters_list, _ = self._adapters_for("dropoff_normal")
+        list_sessions = [CareSession(), CareSession()]
+        list_result = poll_once_per_adapter_into_sessions(
+            adapters_list, list_sessions
+        )
+        adapters_gen, _ = self._adapters_for("dropoff_normal")
+        gen_sessions = [CareSession(), CareSession()]
+        gen_result = poll_once_per_adapter_into_sessions(
+            iter(adapters_gen), iter(gen_sessions)
+        )
+        self.assertIsInstance(gen_result, tuple)
+        for state in gen_result:
+            self.assertIsInstance(state, SessionState)
+        self.assertEqual(gen_result, list_result)
+        for gen_session, list_session in zip(gen_sessions, list_sessions):
+            self.assertEqual(
+                [t.reason for t in gen_session.history],
+                [t.reason for t in list_session.history],
+            )
 
 
 if __name__ == "__main__":
