@@ -30,6 +30,7 @@ __all__ = [
     "apply_raws_for_sessions",
     "apply_raw_sequences_for_sessions",
     "poll_into_sessions",
+    "poll_once_per_adapter_into_session",
     "poll_paired_into_sessions",
     "poll_repeatedly_for_adapters_into_sessions",
     "poll_repeatedly_into_sessions",
@@ -759,3 +760,36 @@ def poll_snapshots_once_per_adapter(
     """
     adapters_tuple = tuple(adapters)
     return tuple(poll_snapshot(adapter) for adapter in adapters_tuple)
+
+
+def poll_once_per_adapter_into_session(
+    adapters: Iterable[VehicleSdkAdapter],
+    session: CareSession,
+) -> SessionState:
+    """어댑터마다 한 번씩 읽어 그 스냅샷들을 한 세션에 순서대로 적용한다.
+
+    poll_snapshots_once_per_adapter(어댑터마다 1회 poll하는 읽기 전용
+    flat 버전)의 적용 쪽 짝이다. poll_paired_into_sessions(어댑터와
+    세션을 짝지어 각 세션에 적용)와 달리, 여기서는 여러 어댑터의
+    스냅샷이 세션 하나에 순서대로 이어서 적용된다.
+    adapters를 먼저 tuple로 구체화하므로 제너레이터 입력도 리스트
+    입력과 같게 동작한다. 빈 입력이면 어떤 어댑터도 poll하지 않고
+    세션을 변경하지 않은 채 현재 상태를 돌려준다. 중복 어댑터는
+    등장할 때마다 따로 poll한다.
+    스냅샷은 적용 전에 poll_snapshots_once_per_adapter로 모두 먼저
+    모으므로, 수집 중 어느 어댑터라도 미연결이면 그 poll의
+    NotImplementedError가 전파되고 어떤 스냅샷도 적용되지 않아
+    세션은 변경되지 않는다.
+
+    Raises:
+        NotImplementedError: 어느 어댑터라도 연결되지 않았으면 수집
+            단계의 poll()에서 낸다. 이때 세션은 변경되지 않는다.
+    """
+    adapters_tuple = tuple(adapters)
+    if not adapters_tuple:
+        return session.state
+    snapshots = poll_snapshots_once_per_adapter(adapters_tuple)
+    state = session.state
+    for snapshot in snapshots:
+        state = session.apply_snapshot(snapshot)
+    return state

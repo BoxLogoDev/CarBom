@@ -80,6 +80,7 @@ ADAPTER_SOURCES = {
     "apply_raws_paired_for_sessions": vehicle_sdk,
     "apply_raw_sequences_for_sessions": vehicle_sdk,
     "poll_into_sessions": vehicle_sdk,
+    "poll_once_per_adapter_into_session": vehicle_sdk,
     "poll_paired_into_sessions": vehicle_sdk,
     "poll_repeatedly_into_sessions": vehicle_sdk,
     "poll_repeatedly_into_sessions_by_times": vehicle_sdk,
@@ -332,6 +333,13 @@ class TestBulkHelperExports(unittest.TestCase):
         self.assertIs(
             adapters.poll_snapshots_once_per_adapter,
             vehicle_sdk.poll_snapshots_once_per_adapter,
+        )
+        self.assertIn(
+            "poll_once_per_adapter_into_session", adapters.__all__
+        )
+        self.assertIs(
+            adapters.poll_once_per_adapter_into_session,
+            vehicle_sdk.poll_once_per_adapter_into_session,
         )
 
 
