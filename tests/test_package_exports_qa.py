@@ -86,6 +86,7 @@ ADAPTER_SOURCES = {
     "poll_repeatedly_into_sessions": vehicle_sdk,
     "poll_repeatedly_into_sessions_by_times": vehicle_sdk,
     "poll_repeatedly_paired_into_sessions": vehicle_sdk,
+    "poll_repeatedly_for_adapters_into_session": vehicle_sdk,
     "poll_repeatedly_for_adapters_into_sessions": vehicle_sdk,
     "poll_snapshot": vehicle_sdk,
     "poll_snapshots": vehicle_sdk,
@@ -348,6 +349,13 @@ class TestBulkHelperExports(unittest.TestCase):
         self.assertIs(
             adapters.poll_once_per_adapter_into_sessions,
             vehicle_sdk.poll_once_per_adapter_into_sessions,
+        )
+        self.assertIn(
+            "poll_repeatedly_for_adapters_into_session", adapters.__all__
+        )
+        self.assertIs(
+            adapters.poll_repeatedly_for_adapters_into_session,
+            vehicle_sdk.poll_repeatedly_for_adapters_into_session,
         )
 
 

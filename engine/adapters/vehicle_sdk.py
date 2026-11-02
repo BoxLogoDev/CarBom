@@ -33,6 +33,7 @@ __all__ = [
     "poll_once_per_adapter_into_session",
     "poll_once_per_adapter_into_sessions",
     "poll_paired_into_sessions",
+    "poll_repeatedly_for_adapters_into_session",
     "poll_repeatedly_for_adapters_into_sessions",
     "poll_repeatedly_into_sessions",
     "poll_repeatedly_into_sessions_by_times",
@@ -831,3 +832,48 @@ def poll_once_per_adapter_into_sessions(
     return tuple(
         session.apply_snapshots(snapshots) for session in sessions_tuple
     )
+
+
+def poll_repeatedly_for_adapters_into_session(
+    adapters: Iterable[VehicleSdkAdapter],
+    session: CareSession,
+    times: int,
+) -> SessionState:
+    """여러 어댑터를 같은 횟수만큼 읽어 그 스냅샷들을 세션 하나에 적용한다.
+
+    poll_snapshots_for_adapters(어댑터마다 균일 횟수 읽기)의 적용 쪽
+    짝이며, poll_once_per_adapter_into_session(어댑터마다 1회)의 반복
+    버전이다. poll_repeatedly_for_adapters_into_sessions(어댑터와
+    세션을 짝지어 각 세션에 자기 어댑터 몫만 적용)와 달리, 여기서는
+    모든 어댑터의 스냅샷이 세션 하나에 어댑터 순서대로 이어서
+    적용된다.
+    adapters를 먼저 tuple로 구체화하므로 제너레이터 입력도 리스트
+    입력과 같게 동작한다. 중복 어댑터는 등장할 때마다 따로 poll한다.
+    스냅샷은 적용 전에 poll_snapshots_for_adapters로 어댑터별
+    슬라이스를 모두 먼저 모은 뒤 flatten하므로, 수집 중 어느
+    어댑터라도 미연결이면 그 poll의 NotImplementedError가 전파되고
+    세션은 변경되지 않는다(단, 앞선 어댑터들의 poll은 이미 일어났을
+    수 있다).
+    adapters가 비어 있거나 times가 0이면 어떤 어댑터도 poll하지 않고
+    세션의 현재 상태를 그대로 돌려주므로, 클라이언트 미연결
+    어댑터에서도 예외가 나지 않는다.
+
+    Raises:
+        ValueError: times가 음수이면 낸다. adapters가 비어 있어도
+            이 검사가 먼저 적용되므로 poll()을 호출하지 않고 세션도
+            변경되지 않으며, 미연결 어댑터에서도 이 검사가 먼저
+            적용된다.
+        NotImplementedError: 어느 어댑터라도 연결되지 않았고 times가
+            양수이면 수집 단계의 poll()에서 낸다. 이때 세션은
+            변경되지 않는다.
+    """
+    if times < 0:
+        raise ValueError(f"times는 0 이상이어야 한다: {times}")
+    adapters_tuple = tuple(adapters)
+    if not adapters_tuple or times == 0:
+        return session.state
+    slices = poll_snapshots_for_adapters(adapters_tuple, times)
+    snapshots = tuple(
+        snapshot for slice_ in slices for snapshot in slice_
+    )
+    return session.apply_snapshots(snapshots)
