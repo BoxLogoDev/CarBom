@@ -37,6 +37,7 @@ __all__ = [
     "poll_repeatedly_for_adapters_into_sessions",
     "poll_repeatedly_into_sessions",
     "poll_repeatedly_into_sessions_by_times",
+    "poll_repeatedly_paired_into_session",
     "poll_repeatedly_paired_into_sessions",
     "poll_snapshot",
     "poll_snapshots",
@@ -873,6 +874,60 @@ def poll_repeatedly_for_adapters_into_session(
     if not adapters_tuple or times == 0:
         return session.state
     slices = poll_snapshots_for_adapters(adapters_tuple, times)
+    snapshots = tuple(
+        snapshot for slice_ in slices for snapshot in slice_
+    )
+    return session.apply_snapshots(snapshots)
+
+
+def poll_repeatedly_paired_into_session(
+    adapters: Iterable[VehicleSdkAdapter],
+    session: CareSession,
+    times_list: Iterable[int],
+) -> SessionState:
+    """어댑터마다 다른 횟수만큼 읽어 그 스냅샷들을 세션 하나에 적용한다.
+
+    poll_snapshots_paired(어댑터마다 다른 횟수 읽기)의 적용 쪽 짝이며,
+    poll_repeatedly_paired_into_sessions(어댑터와 세션을 짝지어 각
+    세션에 자기 어댑터 몫만 적용)의 단일 세션 버전이다.
+    poll_repeatedly_for_adapters_into_session(균일 횟수 단일 세션
+    버전)과 달리, 여기서는 어댑터마다 반복 횟수가 다르다.
+    adapters와 times_list를 먼저 각각 tuple로 구체화하므로
+    제너레이터 입력도 리스트 입력과 같게 동작한다. 중복 어댑터는
+    등장할 때마다 따로 poll한다.
+    스냅샷은 적용 전에 poll_snapshots_paired로 어댑터별 슬라이스를
+    모두 먼저 모은 뒤 어댑터 순서대로 flatten하므로, 수집 중 어느
+    어댑터라도 미연결이면 그 poll의 NotImplementedError가 전파되고
+    어떤 스냅샷도 적용되지 않아 세션은 변경되지 않는다(단, 앞선
+    어댑터들의 poll은 이미 일어났을 수 있다).
+    adapters가 비어 있거나 모든 times가 0이면 어떤 어댑터도
+    poll하지 않고 세션의 현재 상태를 그대로 돌려주므로, 클라이언트
+    미연결 어댑터에서도 예외가 나지 않는다.
+
+    Raises:
+        ValueError: adapters와 times_list의 길이가 다르면 낸다.
+            길이 검사가 모든 poll보다 먼저 끝나므로 어떤 어댑터의
+            poll도 호출되지 않고 세션도 변경되지 않는다.
+        ValueError: 어느 times라도 음수이면 낸다. 길이 검사 다음에
+            적용되므로 poll()을 호출하지 않고 세션도 변경되지
+            않으며, 미연결 어댑터에서도 이 검사가 먼저 적용된다.
+        NotImplementedError: 어느 어댑터라도 연결되지 않았고 그
+            어댑터의 times가 양수이면 수집 단계의 poll()에서 낸다.
+            이때 세션은 변경되지 않는다.
+    """
+    adapters_tuple = tuple(adapters)
+    times_tuple = tuple(times_list)
+    if len(adapters_tuple) != len(times_tuple):
+        raise ValueError(
+            "어댑터 수와 반복 횟수 수가 다릅니다: "
+            f"{len(adapters_tuple)} != {len(times_tuple)}"
+        )
+    for times in times_tuple:
+        if times < 0:
+            raise ValueError(f"times는 0 이상이어야 한다: {times}")
+    if not adapters_tuple or all(times == 0 for times in times_tuple):
+        return session.state
+    slices = poll_snapshots_paired(adapters_tuple, times_tuple)
     snapshots = tuple(
         snapshot for slice_ in slices for snapshot in slice_
     )
