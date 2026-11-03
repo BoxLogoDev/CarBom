@@ -12,6 +12,8 @@
 대량 헬퍼는 세션들을 입력 순서대로 읽어 리포트들을 돌려주며,
 세션을 바꾸지 않는다.
 누적함의 대량 추가는 리포트들을 입력 순서대로 누적하고 돌려준다.
+누적함의 필터 조회는 누적된 리포트 중 조건에 맞는 것만 누적 순서
+그대로 돌려주며, 누적함을 바꾸지 않는다.
 """
 
 from __future__ import annotations
@@ -166,6 +168,45 @@ class CareReportLog:
     def reports(self) -> tuple[CareReport, ...]:
         """누적된 리포트들의 복사본."""
         return tuple(self._reports)
+
+    @property
+    def completed_reports(self) -> tuple[CareReport, ...]:
+        """완료된 리포트만 누적 순서 그대로 담은 tuple.
+
+        completed 가 True 인 리포트만 고른다. exception_reports 와는
+        독립적인 필터라, 예외 뒤 회복 완료한 리포트는 양쪽에 모두
+        들어간다. 누적함은 바꾸지 않으며, 빈 누적함이면 빈 tuple 이다.
+        """
+        return tuple(
+            report for report in self._reports if report.completed
+        )
+
+    @property
+    def exception_reports(self) -> tuple[CareReport, ...]:
+        """예외가 발생한 리포트만 누적 순서 그대로 담은 tuple.
+
+        exception_occurred 가 True 인 리포트만 고른다.
+        completed_reports 와는 독립적인 필터라, 예외 뒤 회복 완료한
+        리포트는 양쪽에 모두 들어간다. 누적함은 바꾸지 않으며,
+        빈 누적함이면 빈 tuple 이다.
+        """
+        return tuple(
+            report
+            for report in self._reports
+            if report.exception_occurred
+        )
+
+    @property
+    def incomplete_reports(self) -> tuple[CareReport, ...]:
+        """완료되지 않은 리포트만 누적 순서 그대로 담은 tuple.
+
+        completed 가 False 인 리포트만 고르며, completed_reports 의
+        여집합이다(진행 중 리포트와 예외 미해결 리포트가 들어간다).
+        누적함은 바꾸지 않으며, 빈 누적함이면 빈 tuple 이다.
+        """
+        return tuple(
+            report for report in self._reports if not report.completed
+        )
 
     def __len__(self) -> int:
         return len(self._reports)

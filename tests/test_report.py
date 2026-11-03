@@ -537,5 +537,124 @@ class AddReportsTest(unittest.TestCase):
         )
 
 
+class CareReportLogFilterTest(unittest.TestCase):
+    def test_empty_log_filters_are_empty_tuples(self):
+        log = CareReportLog()
+
+        self.assertEqual(log.completed_reports, ())
+        self.assertEqual(log.exception_reports, ())
+        self.assertEqual(log.incomplete_reports, ())
+
+    def test_completed_reports_keeps_only_completed_in_order(self):
+        completed = CareSession()
+        complete_normally(completed, start=1000.0)
+        exception = CareSession()
+        drive_to_exception(exception, start=2000.0)
+        in_progress = CareSession()
+        log = CareReportLog()
+        returned = log.add_sessions([completed, exception, in_progress])
+
+        self.assertEqual(log.completed_reports, (returned[0],))
+        self.assertTrue(log.completed_reports[0].completed)
+        self.assertEqual(
+            log.completed_reports,
+            tuple(r for r in log.reports if r.completed),
+        )
+
+    def test_exception_reports_includes_recovered_and_unresolved(self):
+        recovered = CareSession()
+        drive_to_exception(recovered, start=1000.0)
+        recovered.apply_snapshot(
+            snapshot(rear_door=DoorState.OPEN, timestamp=1130.0)
+        )
+        recovered.apply_snapshot(snapshot(timestamp=1140.0))
+        unresolved = CareSession()
+        drive_to_exception(unresolved, start=2000.0)
+        normal = CareSession()
+        complete_normally(normal, start=3000.0)
+        log = CareReportLog()
+        returned = log.add_sessions([recovered, unresolved, normal])
+
+        self.assertEqual(log.exception_reports, (returned[0], returned[1]))
+        self.assertTrue(returned[0].completed)
+        self.assertTrue(returned[0].exception_occurred)
+        # 예외 뒤 회복 완료한 리포트는 완료 필터에도 함께 들어간다.
+        self.assertIn(returned[0], log.completed_reports)
+
+    def test_incomplete_reports_is_complement_of_completed(self):
+        recovered = CareSession()
+        drive_to_exception(recovered, start=1000.0)
+        recovered.apply_snapshot(
+            snapshot(rear_door=DoorState.OPEN, timestamp=1130.0)
+        )
+        recovered.apply_snapshot(snapshot(timestamp=1140.0))
+        unresolved = CareSession()
+        drive_to_exception(unresolved, start=2000.0)
+        in_progress = CareSession()
+        board_and_drive(in_progress, start=3000.0)
+        log = CareReportLog()
+        returned = log.add_sessions([recovered, unresolved, in_progress])
+
+        self.assertEqual(log.incomplete_reports, (returned[1], returned[2]))
+        self.assertEqual(
+            len(log.completed_reports) + len(log.incomplete_reports),
+            len(log.reports),
+        )
+
+    def test_filters_from_fixed_scenarios_via_add_sessions(self):
+        from engine.adapters.simulator import replay_scenario
+
+        sessions = []
+        for name in (
+            "dropoff_normal",
+            "forgotten_rising_temp",
+            "pet_dropoff",
+        ):
+            session = CareSession()
+            replay_scenario(session, name)
+            sessions.append(session)
+        log = CareReportLog()
+        returned = log.add_sessions(sessions)
+
+        self.assertEqual(len(log.completed_reports), 2)
+        self.assertEqual(len(log.exception_reports), 1)
+        self.assertEqual(len(log.incomplete_reports), 1)
+        self.assertEqual(log.completed_reports, (returned[0], returned[2]))
+        self.assertEqual(log.exception_reports, (returned[1],))
+        self.assertEqual(log.incomplete_reports, (returned[1],))
+        self.assertEqual(
+            log.exception_reports,
+            tuple(r for r in log.reports if r.exception_occurred),
+        )
+        self.assertEqual(
+            log.incomplete_reports,
+            tuple(r for r in log.reports if not r.completed),
+        )
+
+    def test_filter_results_are_isolated_tuples(self):
+        completed = CareSession()
+        complete_normally(completed, start=1000.0)
+        log = CareReportLog()
+        log.add_session(completed)
+
+        completed_before = log.completed_reports
+        exception_before = log.exception_reports
+        incomplete_before = log.incomplete_reports
+
+        self.assertIsInstance(completed_before, tuple)
+        self.assertIsInstance(exception_before, tuple)
+        self.assertIsInstance(incomplete_before, tuple)
+
+        exception = CareSession()
+        drive_to_exception(exception, start=2000.0)
+        log.add_session(exception)
+
+        self.assertEqual(completed_before, log.completed_reports)
+        self.assertEqual(exception_before, ())
+        self.assertEqual(incomplete_before, ())
+        self.assertEqual(len(log.exception_reports), 1)
+        self.assertEqual(len(log.incomplete_reports), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
