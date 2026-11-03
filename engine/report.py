@@ -20,6 +20,8 @@
 합계이며, 빈 누적함이면 0이다.
 누적함의 예외 없는 수는 exception_occurred 가 False 인 리포트의
 개수이며, 전체 개수에서 예외 있는 수를 뺀 값과 같고, 빈 누적함이면 0이다.
+누적함의 전체 소요 시간은 duration_seconds 가 있는 리포트들의
+duration_seconds 합계이며, 그런 리포트가 하나도 없으면 None 이다.
 """
 
 from __future__ import annotations
@@ -273,6 +275,23 @@ class CareReportLog:
             if report.max_cabin_temp_c is not None
         ]
         return max(temps) if temps else None
+
+    @property
+    def total_duration_seconds(self) -> float | None:
+        """소요 시간이 기록된 리포트들의 소요 시간 합계(초).
+
+        duration_seconds 가 None 인 리포트는 합계에서 빼며,
+        소요 시간이 기록된 리포트가 하나도 없으면 None이다.
+        average_duration_seconds 와 같은 규약이다.
+        """
+        durations = [
+            report.duration_seconds
+            for report in self._reports
+            if report.duration_seconds is not None
+        ]
+        if not durations:
+            return None
+        return sum(durations)
 
     @property
     def average_duration_seconds(self) -> float | None:
