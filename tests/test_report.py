@@ -656,5 +656,87 @@ class CareReportLogFilterTest(unittest.TestCase):
         self.assertEqual(len(log.incomplete_reports), 1)
 
 
+class CareReportLogIncompleteCountTest(unittest.TestCase):
+    def test_empty_log_incomplete_count_is_zero(self):
+        log = CareReportLog()
+
+        self.assertEqual(log.incomplete_count, 0)
+        self.assertEqual(log.completed_count, 0)
+        self.assertEqual(len(log), 0)
+
+    def test_completed_only_reports_have_zero_incomplete_count(self):
+        log = CareReportLog()
+        log.add_report(make_report())
+        log.add_report(make_report(exception_count=1))
+
+        self.assertEqual(log.incomplete_count, 0)
+        self.assertEqual(log.completed_count, 2)
+
+    def test_in_progress_only_reports_count_as_incomplete(self):
+        log = CareReportLog()
+        log.add_report(
+            make_report(
+                final_state=SessionState.DRIVING,
+                completed=False,
+            )
+        )
+        log.add_report(
+            make_report(
+                final_state=SessionState.BOARDING,
+                completed=False,
+            )
+        )
+
+        self.assertEqual(log.incomplete_count, 2)
+        self.assertEqual(log.completed_count, 0)
+
+    def test_mixed_reports_incomplete_count_is_complement(self):
+        log = CareReportLog()
+        log.add_report(make_report())
+        log.add_report(make_report(exception_count=2))
+        log.add_report(
+            make_report(
+                final_state=SessionState.EXCEPTION,
+                completed=False,
+                exception_count=1,
+            )
+        )
+        log.add_report(
+            make_report(
+                final_state=SessionState.DRIVING,
+                completed=False,
+            )
+        )
+
+        self.assertEqual(len(log), 4)
+        self.assertEqual(log.completed_count, 2)
+        self.assertEqual(log.incomplete_count, 2)
+        self.assertEqual(log.incomplete_count, len(log) - log.completed_count)
+        self.assertEqual(log.incomplete_count, len(log.incomplete_reports))
+
+    def test_duplicate_incomplete_report_counts_twice(self):
+        report = make_report(
+            final_state=SessionState.EXCEPTION,
+            completed=False,
+            exception_count=1,
+        )
+        log = CareReportLog()
+        log.add_report(report)
+        log.add_report(report)
+
+        self.assertEqual(log.incomplete_count, 2)
+
+    def test_incomplete_count_from_real_sessions(self):
+        completed = CareSession()
+        complete_normally(completed, start=1000.0)
+        unresolved = CareSession()
+        drive_to_exception(unresolved, start=2000.0)
+        log = CareReportLog()
+        log.add_sessions([completed, unresolved])
+
+        self.assertEqual(log.incomplete_count, 1)
+        self.assertEqual(log.completed_count, 1)
+
+
 if __name__ == "__main__":
     unittest.main()

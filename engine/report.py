@@ -14,6 +14,8 @@
 누적함의 대량 추가는 리포트들을 입력 순서대로 누적하고 돌려준다.
 누적함의 필터 조회는 누적된 리포트 중 조건에 맞는 것만 누적 순서
 그대로 돌려주며, 누적함을 바꾸지 않는다.
+누적함의 미완료 수는 완료되지 않은 리포트의 개수이며, 전체 개수에서
+완료 수를 뺀 값이자 미완료 필터 조회의 길이와 같다.
 """
 
 from __future__ import annotations
@@ -215,6 +217,16 @@ class CareReportLog:
     def completed_count(self) -> int:
         """완료된 리포트 수."""
         return sum(1 for report in self._reports if report.completed)
+
+    @property
+    def incomplete_count(self) -> int:
+        """완료되지 않은 리포트 수.
+
+        completed 가 False 인 리포트의 개수이며, completed_count 의
+        여집합이다(전체 개수 - 완료 수). incomplete_reports 필터
+        조회의 길이와 같고, 빈 누적함이면 0이다.
+        """
+        return sum(1 for report in self._reports if not report.completed)
 
     @property
     def sessions_with_exception(self) -> int:
