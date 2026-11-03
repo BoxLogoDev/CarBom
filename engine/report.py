@@ -24,6 +24,8 @@
 duration_seconds 합계이며, 그런 리포트가 하나도 없으면 None 이다.
 누적함의 최장 소요 시간은 duration_seconds 가 있는 리포트들의
 duration_seconds 중 최대값이며, 그런 리포트가 하나도 없으면 None 이다.
+누적함의 최단 소요 시간은 duration_seconds 가 있는 리포트들의
+duration_seconds 중 최소값이며, 그런 리포트가 하나도 없으면 None 이다.
 """
 
 from __future__ import annotations
@@ -311,6 +313,23 @@ class CareReportLog:
         if not durations:
             return None
         return max(durations)
+
+    @property
+    def min_duration_seconds(self) -> float | None:
+        """소요 시간이 기록된 리포트들의 최소 소요 시간(초).
+
+        duration_seconds 가 None 인 리포트는 최소값 계산에서 빼며,
+        소요 시간이 기록된 리포트가 하나도 없으면 None이다.
+        max_cabin_temp_c·max_duration_seconds 와 같은 규약이다.
+        """
+        durations = [
+            report.duration_seconds
+            for report in self._reports
+            if report.duration_seconds is not None
+        ]
+        if not durations:
+            return None
+        return min(durations)
 
     @property
     def average_duration_seconds(self) -> float | None:

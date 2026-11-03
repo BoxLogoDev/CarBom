@@ -1030,5 +1030,66 @@ class CareReportLogMaxDurationSecondsTest(unittest.TestCase):
         self.assertEqual(log.total_duration_seconds, 840.0)
 
 
+class CareReportLogMinDurationSecondsTest(unittest.TestCase):
+    def test_empty_log_min_duration_is_none(self):
+        log = CareReportLog()
+
+        self.assertIsNone(log.min_duration_seconds)
+
+    def test_min_duration_picks_smallest_duration(self):
+        log = CareReportLog()
+        log.add_report(make_report(duration_seconds=300.0))
+        log.add_report(make_report(duration_seconds=240.0))
+
+        self.assertEqual(log.min_duration_seconds, 240.0)
+
+    def test_min_duration_ignores_none_durations(self):
+        log = CareReportLog()
+        log.add_report(make_report(duration_seconds=None))
+        log.add_report(make_report(duration_seconds=240.0))
+
+        self.assertEqual(log.min_duration_seconds, 240.0)
+
+    def test_min_duration_is_none_when_all_durations_none(self):
+        log = CareReportLog()
+        log.add_report(make_report(duration_seconds=None))
+        log.add_report(make_report(duration_seconds=None))
+
+        self.assertIsNone(log.min_duration_seconds)
+
+    def test_duplicate_report_min_stays_and_lookup_does_not_mutate(self):
+        report = make_report(duration_seconds=300.0)
+        log = CareReportLog()
+        log.add_report(report)
+        log.add_report(report)
+        reports_before = log.reports
+
+        self.assertEqual(log.min_duration_seconds, 300.0)
+        self.assertEqual(log.min_duration_seconds, 300.0)
+        self.assertEqual(log.reports, reports_before)
+        self.assertEqual(len(log), 2)
+
+    def test_min_duration_from_fixed_scenarios(self):
+        from engine.adapters.simulator import replay_scenario
+
+        sessions = []
+        for name in (
+            "dropoff_normal",
+            "forgotten_rising_temp",
+            "pet_dropoff",
+        ):
+            session = CareSession()
+            replay_scenario(session, name)
+            sessions.append(session)
+        log = CareReportLog()
+        returned = log.add_sessions(sessions)
+
+        self.assertEqual(returned[0].duration_seconds, 300.0)
+        self.assertEqual(returned[1].duration_seconds, 240.0)
+        self.assertEqual(returned[2].duration_seconds, 300.0)
+        self.assertEqual(log.min_duration_seconds, 240.0)
+        self.assertEqual(log.total_duration_seconds, 840.0)
+
+
 if __name__ == "__main__":
     unittest.main()
