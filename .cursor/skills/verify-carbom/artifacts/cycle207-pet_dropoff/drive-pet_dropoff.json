@@ -1,0 +1,63 @@
+{
+  "scenario": "pet_dropoff",
+  "final_state": "COMPLETED",
+  "expected_final_state": "COMPLETED",
+  "passenger_present": false,
+  "current_snapshot": {
+    "cabin_temp_c": null,
+    "timestamp": 300.0
+  },
+  "transitions": [
+    {
+      "from_state": "IDLE",
+      "to_state": "BOARDING",
+      "reason": "rear_door_opened",
+      "timestamp": 0.0
+    },
+    {
+      "from_state": "BOARDING",
+      "to_state": "ONBOARD",
+      "reason": "passenger_onboard",
+      "timestamp": 60.0
+    },
+    {
+      "from_state": "ONBOARD",
+      "to_state": "DRIVING",
+      "reason": "ignition_on",
+      "timestamp": 120.0
+    },
+    {
+      "from_state": "DRIVING",
+      "to_state": "ARRIVED",
+      "reason": "ignition_off",
+      "timestamp": 180.0
+    },
+    {
+      "from_state": "ARRIVED",
+      "to_state": "ALIGHTING",
+      "reason": "alighting_started",
+      "timestamp": 240.0
+    },
+    {
+      "from_state": "ALIGHTING",
+      "to_state": "COMPLETED",
+      "reason": "alighting_confirmed",
+      "timestamp": 300.0
+    }
+  ],
+  "guidance": {
+    "level": "INFO",
+    "text": "하차 확인이 완료되었습니다.",
+    "reason": "completed"
+  },
+  "report": {
+    "final_state": "COMPLETED",
+    "completed": true,
+    "exception_occurred": false,
+    "exception_count": 0,
+    "transition_count": 6,
+    "max_cabin_temp_c": null,
+    "duration_seconds": 300.0,
+    "summary": "하차 확인 완료 · 예외 없음"
+  }
+}
