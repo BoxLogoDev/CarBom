@@ -738,5 +738,83 @@ class CareReportLogIncompleteCountTest(unittest.TestCase):
         self.assertEqual(log.completed_count, 1)
 
 
+class CareReportLogTotalTransitionCountTest(unittest.TestCase):
+    def test_empty_log_total_transition_count_is_zero(self):
+        log = CareReportLog()
+
+        self.assertEqual(log.total_transition_count, 0)
+
+    def test_completed_only_reports_sum_transition_counts(self):
+        log = CareReportLog()
+        log.add_report(make_report(transition_count=6))
+        log.add_report(make_report(transition_count=6))
+
+        self.assertEqual(log.total_transition_count, 12)
+
+    def test_in_progress_only_report_counts_transitions(self):
+        log = CareReportLog()
+        log.add_report(
+            make_report(
+                final_state=SessionState.DRIVING,
+                completed=False,
+                transition_count=2,
+            )
+        )
+
+        self.assertEqual(log.total_transition_count, 2)
+
+    def test_mixed_reports_match_sum_of_transition_counts(self):
+        log = CareReportLog()
+        log.add_report(make_report(transition_count=6))
+        log.add_report(
+            make_report(
+                final_state=SessionState.EXCEPTION,
+                completed=False,
+                exception_count=1,
+                transition_count=5,
+            )
+        )
+        log.add_report(
+            make_report(
+                final_state=SessionState.DRIVING,
+                completed=False,
+                transition_count=2,
+            )
+        )
+        log.add_report(make_report(transition_count=0))
+
+        self.assertEqual(log.total_transition_count, 13)
+        self.assertEqual(
+            log.total_transition_count,
+            sum(r.transition_count for r in log.reports),
+        )
+
+    def test_duplicate_report_counts_twice_without_dedup(self):
+        report = make_report(transition_count=4)
+        log = CareReportLog()
+        log.add_report(report)
+        log.add_report(report)
+
+        self.assertEqual(log.total_transition_count, 8)
+        self.assertEqual(
+            log.total_transition_count, 2 * report.transition_count
+        )
+
+    def test_total_transition_count_from_fixed_scenarios(self):
+        from engine.adapters.simulator import replay_scenario
+
+        sessions = []
+        for name in ("dropoff_normal", "forgotten_rising_temp"):
+            session = CareSession()
+            replay_scenario(session, name)
+            sessions.append(session)
+        log = CareReportLog()
+        returned = log.add_sessions(sessions)
+
+        self.assertEqual(returned[0].transition_count, 6)
+        self.assertEqual(returned[1].transition_count, 5)
+        self.assertEqual(log.total_transition_count, 11)
+
+
 if __name__ == "__main__":
     unittest.main()

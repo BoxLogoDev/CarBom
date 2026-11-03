@@ -16,6 +16,8 @@
 그대로 돌려주며, 누적함을 바꾸지 않는다.
 누적함의 미완료 수는 완료되지 않은 리포트의 개수이며, 전체 개수에서
 완료 수를 뺀 값이자 미완료 필터 조회의 길이와 같다.
+누적함의 전체 전이 수는 누적된 모든 리포트의 transition_count
+합계이며, 빈 누적함이면 0이다.
 """
 
 from __future__ import annotations
@@ -239,6 +241,11 @@ class CareReportLog:
     def total_exception_count(self) -> int:
         """누적된 모든 리포트의 예외 진입 횟수 합계."""
         return sum(report.exception_count for report in self._reports)
+
+    @property
+    def total_transition_count(self) -> int:
+        """누적된 모든 리포트의 전이 이력 건수 합계."""
+        return sum(report.transition_count for report in self._reports)
 
     @property
     def max_cabin_temp_c(self) -> float | None:
