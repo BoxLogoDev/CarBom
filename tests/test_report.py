@@ -816,5 +816,93 @@ class CareReportLogTotalTransitionCountTest(unittest.TestCase):
         self.assertEqual(log.total_transition_count, 11)
 
 
+class CareReportLogSessionsWithoutExceptionTest(unittest.TestCase):
+    def test_empty_log_sessions_without_exception_is_zero(self):
+        log = CareReportLog()
+
+        self.assertEqual(log.sessions_without_exception, 0)
+        self.assertEqual(log.sessions_with_exception, 0)
+        self.assertEqual(len(log), 0)
+
+    def test_exception_free_only_reports_count_all(self):
+        log = CareReportLog()
+        log.add_report(make_report())
+        log.add_report(
+            make_report(
+                final_state=SessionState.DRIVING,
+                completed=False,
+            )
+        )
+
+        self.assertEqual(log.sessions_without_exception, 2)
+        self.assertEqual(log.sessions_with_exception, 0)
+
+    def test_exception_only_reports_have_zero_without_exception(self):
+        log = CareReportLog()
+        log.add_report(make_report(exception_count=1))
+        log.add_report(
+            make_report(
+                final_state=SessionState.EXCEPTION,
+                completed=False,
+                exception_count=1,
+            )
+        )
+
+        self.assertEqual(log.sessions_without_exception, 0)
+        self.assertEqual(log.sessions_with_exception, 2)
+
+    def test_mixed_reports_split_between_with_and_without_exception(self):
+        log = CareReportLog()
+        log.add_report(make_report())
+        log.add_report(make_report(exception_count=2))
+        log.add_report(
+            make_report(
+                final_state=SessionState.EXCEPTION,
+                completed=False,
+                exception_count=1,
+            )
+        )
+        log.add_report(
+            make_report(
+                final_state=SessionState.DRIVING,
+                completed=False,
+            )
+        )
+
+        self.assertEqual(len(log), 4)
+        self.assertEqual(log.sessions_without_exception, 2)
+        self.assertEqual(log.sessions_with_exception, 2)
+        self.assertEqual(
+            log.sessions_without_exception + log.sessions_with_exception,
+            len(log),
+        )
+
+    def test_duplicate_exception_free_report_counts_twice(self):
+        report = make_report()
+        log = CareReportLog()
+        log.add_report(report)
+        log.add_report(report)
+
+        self.assertEqual(log.sessions_without_exception, 2)
+
+    def test_sessions_without_exception_from_fixed_scenarios(self):
+        from engine.adapters.simulator import replay_scenario
+
+        sessions = []
+        for name in (
+            "dropoff_normal",
+            "forgotten_rising_temp",
+            "pet_dropoff",
+        ):
+            session = CareSession()
+            replay_scenario(session, name)
+            sessions.append(session)
+        log = CareReportLog()
+        log.add_sessions(sessions)
+
+        self.assertEqual(log.sessions_without_exception, 2)
+        self.assertEqual(log.sessions_with_exception, 1)
+
+
 if __name__ == "__main__":
     unittest.main()

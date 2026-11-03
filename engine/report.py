@@ -18,6 +18,8 @@
 완료 수를 뺀 값이자 미완료 필터 조회의 길이와 같다.
 누적함의 전체 전이 수는 누적된 모든 리포트의 transition_count
 합계이며, 빈 누적함이면 0이다.
+누적함의 예외 없는 수는 exception_occurred 가 False 인 리포트의
+개수이며, 전체 개수에서 예외 있는 수를 뺀 값과 같고, 빈 누적함이면 0이다.
 """
 
 from __future__ import annotations
@@ -235,6 +237,18 @@ class CareReportLog:
         """예외가 발생한 세션 수."""
         return sum(
             1 for report in self._reports if report.exception_occurred
+        )
+
+    @property
+    def sessions_without_exception(self) -> int:
+        """예외가 발생하지 않은 세션 수.
+
+        exception_occurred 가 False 인 리포트의 개수이며,
+        sessions_with_exception 의 여집합이다(전체 개수 - 예외 있는 수).
+        누적함은 바꾸지 않으며, 빈 누적함이면 0이다.
+        """
+        return sum(
+            1 for report in self._reports if not report.exception_occurred
         )
 
     @property
