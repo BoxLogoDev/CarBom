@@ -1091,5 +1091,108 @@ class CareReportLogMinDurationSecondsTest(unittest.TestCase):
         self.assertEqual(log.total_duration_seconds, 840.0)
 
 
+class CareReportLogReportsWithoutExceptionTest(unittest.TestCase):
+    def test_empty_log_reports_without_exception_is_empty_tuple(self):
+        log = CareReportLog()
+
+        self.assertEqual(log.reports_without_exception, ())
+        self.assertIsInstance(log.reports_without_exception, tuple)
+
+    def test_non_exception_only_reports_are_all_returned_in_order(self):
+        first = make_report()
+        second = make_report(exception_count=0, completed=False)
+        log = CareReportLog()
+        log.add_report(first)
+        log.add_report(second)
+
+        self.assertEqual(log.reports_without_exception, (first, second))
+        self.assertTrue(
+            all(
+                not report.exception_occurred
+                for report in log.reports_without_exception
+            )
+        )
+        self.assertEqual(log.exception_reports, ())
+
+    def test_exception_only_reports_return_empty_tuple(self):
+        log = CareReportLog()
+        log.add_report(make_report(exception_count=1))
+        log.add_report(make_report(exception_count=2))
+
+        self.assertEqual(log.reports_without_exception, ())
+        self.assertEqual(len(log.exception_reports), 2)
+
+    def test_mixed_reports_partition_with_exception_reports(self):
+        clean_completed = make_report()
+        with_exception = make_report(exception_count=1)
+        clean_in_progress = make_report(completed=False)
+        recovered = make_report(exception_count=1, completed=True)
+        log = CareReportLog()
+        for report in (
+            clean_completed,
+            with_exception,
+            clean_in_progress,
+            recovered,
+        ):
+            log.add_report(report)
+
+        self.assertEqual(
+            log.reports_without_exception,
+            (clean_completed, clean_in_progress),
+        )
+        self.assertEqual(
+            log.exception_reports, (with_exception, recovered)
+        )
+        self.assertEqual(
+            len(log.reports_without_exception) + len(log.exception_reports),
+            len(log.reports),
+        )
+        self.assertEqual(
+            len(log.reports_without_exception),
+            log.sessions_without_exception,
+        )
+        self.assertEqual(
+            log.reports_without_exception,
+            tuple(r for r in log.reports if not r.exception_occurred),
+        )
+
+    def test_duplicate_report_kept_twice_and_lookup_does_not_mutate(self):
+        report = make_report()
+        log = CareReportLog()
+        log.add_report(report)
+        log.add_report(report)
+        reports_before = log.reports
+
+        self.assertEqual(log.reports_without_exception, (report, report))
+        self.assertEqual(log.reports_without_exception, (report, report))
+        self.assertEqual(log.reports, reports_before)
+        self.assertEqual(len(log), 2)
+
+    def test_reports_without_exception_from_fixed_scenarios(self):
+        from engine.adapters.simulator import replay_scenario
+
+        sessions = []
+        for name in (
+            "dropoff_normal",
+            "forgotten_rising_temp",
+            "pet_dropoff",
+        ):
+            session = CareSession()
+            replay_scenario(session, name)
+            sessions.append(session)
+        log = CareReportLog()
+        returned = log.add_sessions(sessions)
+
+        self.assertEqual(
+            log.reports_without_exception, (returned[0], returned[2])
+        )
+        self.assertEqual(log.exception_reports, (returned[1],))
+        self.assertEqual(len(log.reports_without_exception), 2)
+        self.assertEqual(
+            log.reports_without_exception,
+            tuple(r for r in log.reports if not r.exception_occurred),
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
