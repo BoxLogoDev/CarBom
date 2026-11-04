@@ -1214,6 +1214,67 @@ class CareReportLogAverageCabinTempCTest(unittest.TestCase):
         self.assertEqual(log.min_cabin_temp_c, 35.5)
 
 
+class CareReportLogTotalCabinTempCTest(unittest.TestCase):
+    def test_empty_log_total_cabin_temp_is_none(self):
+        log = CareReportLog()
+
+        self.assertIsNone(log.total_cabin_temp_c)
+
+    def test_total_cabin_temp_sums_peak_temps(self):
+        log = CareReportLog()
+        log.add_report(make_report(max_cabin_temp_c=35.5))
+        log.add_report(make_report(max_cabin_temp_c=28.0))
+
+        self.assertEqual(log.total_cabin_temp_c, 63.5)
+
+    def test_total_cabin_temp_ignores_none_temps(self):
+        log = CareReportLog()
+        log.add_report(make_report(max_cabin_temp_c=None))
+        log.add_report(make_report(max_cabin_temp_c=28.0))
+
+        self.assertEqual(log.total_cabin_temp_c, 28.0)
+
+    def test_total_cabin_temp_is_none_when_all_temps_none(self):
+        log = CareReportLog()
+        log.add_report(make_report(max_cabin_temp_c=None))
+        log.add_report(make_report(max_cabin_temp_c=None))
+
+        self.assertIsNone(log.total_cabin_temp_c)
+
+    def test_duplicate_report_counts_twice_and_lookup_does_not_mutate(self):
+        report = make_report(max_cabin_temp_c=35.5)
+        log = CareReportLog()
+        log.add_report(report)
+        log.add_report(report)
+        reports_before = log.reports
+
+        self.assertEqual(log.total_cabin_temp_c, 71.0)
+        self.assertEqual(log.total_cabin_temp_c, 71.0)
+        self.assertEqual(log.reports, reports_before)
+        self.assertEqual(len(log), 2)
+
+    def test_total_cabin_temp_from_fixed_scenarios(self):
+        from engine.adapters.simulator import replay_scenario
+
+        sessions = []
+        for name in (
+            "dropoff_normal",
+            "forgotten_rising_temp",
+            "pet_dropoff",
+        ):
+            session = CareSession()
+            replay_scenario(session, name)
+            sessions.append(session)
+        log = CareReportLog()
+        returned = log.add_sessions(sessions)
+
+        self.assertIsNone(returned[0].max_cabin_temp_c)
+        self.assertEqual(returned[1].max_cabin_temp_c, 35.5)
+        self.assertIsNone(returned[2].max_cabin_temp_c)
+        self.assertEqual(log.total_cabin_temp_c, 35.5)
+        self.assertEqual(log.total_cabin_temp_c, log.average_cabin_temp_c)
+
+
 class CareReportLogReportsWithoutExceptionTest(unittest.TestCase):
     def test_empty_log_reports_without_exception_is_empty_tuple(self):
         log = CareReportLog()

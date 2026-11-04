@@ -33,6 +33,8 @@ duration_seconds 중 최소값이며, 그런 리포트가 하나도 없으면 No
 max_cabin_temp_c 중 최소값이며, 그런 리포트가 하나도 없으면 None 이다.
 누적함의 평균 최대 실내 온도는 max_cabin_temp_c 가 있는 리포트들의
 max_cabin_temp_c 평균값이며, 그런 리포트가 하나도 없으면 None 이다.
+누적함의 전체 최대 실내 온도는 max_cabin_temp_c 가 있는 리포트들의
+max_cabin_temp_c 합계이며, 그런 리포트가 하나도 없으면 None 이다.
 """
 
 from __future__ import annotations
@@ -334,6 +336,23 @@ class CareReportLog:
         if not temps:
             return None
         return sum(temps) / len(temps)
+
+    @property
+    def total_cabin_temp_c(self) -> float | None:
+        """누적된 리포트들의 최대 실내 온도의 합계(℃).
+
+        max_cabin_temp_c 가 None 인 리포트는 합계에서 빼며,
+        온도가 기록된 리포트가 하나도 없으면 None이다.
+        total_duration_seconds 와 같은 규약이다.
+        """
+        temps = [
+            report.max_cabin_temp_c
+            for report in self._reports
+            if report.max_cabin_temp_c is not None
+        ]
+        if not temps:
+            return None
+        return sum(temps)
 
     @property
     def total_duration_seconds(self) -> float | None:
