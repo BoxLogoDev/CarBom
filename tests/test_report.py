@@ -1696,5 +1696,73 @@ class CareReportLogMinTransitionCountTest(unittest.TestCase):
         self.assertEqual(log.max_transition_count, 6)
 
 
+class CareReportLogAverageTransitionCountTest(unittest.TestCase):
+    def test_empty_log_average_transition_count_is_none(self):
+        log = CareReportLog()
+
+        self.assertIsNone(log.average_transition_count)
+
+    def test_average_transition_count_is_mean_of_counts(self):
+        log = CareReportLog()
+        log.add_report(make_report(transition_count=6))
+        log.add_report(make_report(transition_count=5))
+        log.add_report(make_report(transition_count=4))
+
+        self.assertEqual(log.average_transition_count, 5.0)
+        self.assertEqual(
+            log.average_transition_count,
+            log.total_transition_count / len(log),
+        )
+
+    def test_average_transition_count_is_zero_when_all_zero(self):
+        log = CareReportLog()
+        log.add_report(make_report(transition_count=0))
+        log.add_report(make_report(transition_count=0))
+
+        self.assertEqual(log.average_transition_count, 0.0)
+        self.assertIsNotNone(log.average_transition_count)
+
+    def test_single_report_average_transition_count_is_its_count(self):
+        log = CareReportLog()
+        log.add_report(make_report(transition_count=4))
+
+        self.assertEqual(log.average_transition_count, 4.0)
+
+    def test_duplicate_report_average_stays_and_lookup_does_not_mutate(self):
+        report = make_report(transition_count=4)
+        log = CareReportLog()
+        log.add_report(report)
+        log.add_report(report)
+        reports_before = log.reports
+
+        self.assertEqual(log.average_transition_count, 4.0)
+        self.assertEqual(log.average_transition_count, 4.0)
+        self.assertEqual(log.reports, reports_before)
+        self.assertEqual(len(log), 2)
+
+    def test_average_transition_count_from_fixed_scenarios(self):
+        from engine.adapters.simulator import replay_scenario
+
+        sessions = []
+        for name in (
+            "dropoff_normal",
+            "forgotten_rising_temp",
+            "pet_dropoff",
+        ):
+            session = CareSession()
+            replay_scenario(session, name)
+            sessions.append(session)
+        log = CareReportLog()
+        returned = log.add_sessions(sessions)
+
+        self.assertEqual(returned[0].transition_count, 6)
+        self.assertEqual(returned[1].transition_count, 5)
+        self.assertEqual(returned[2].transition_count, 6)
+        self.assertAlmostEqual(log.average_transition_count, 17 / 3)
+        self.assertEqual(log.total_transition_count, 17)
+        self.assertEqual(log.max_transition_count, 6)
+        self.assertEqual(log.min_transition_count, 5)
+
+
 if __name__ == "__main__":
     unittest.main()

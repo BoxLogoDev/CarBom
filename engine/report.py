@@ -45,6 +45,8 @@ max_cabin_temp_c 합계이며, 그런 리포트가 하나도 없으면 None 이�
 중 최대값이며, 누적된 리포트가 하나도 없으면 None 이다.
 누적함의 최소 전이 수는 누적된 모든 리포트의 transition_count
 중 최소값이며, 누적된 리포트가 하나도 없으면 None 이다.
+누적함의 평균 전이 수는 누적된 모든 리포트의 transition_count
+평균값이며, 누적된 리포트가 하나도 없으면 None 이다.
 """
 
 from __future__ import annotations
@@ -378,6 +380,23 @@ class CareReportLog:
         if not counts:
             return None
         return min(counts)
+
+    @property
+    def average_transition_count(self) -> float | None:
+        """누적된 모든 리포트의 전이 이력 건수의 평균값.
+
+        transition_count 는 모든 리포트에 항상 있는 int 값이라
+        None 제외를 하지 않으며, 누적된 리포트가 하나도 없으면
+        None이다. total_transition_count 를 누적 리포트 수로 나눈
+        값과 같고, max_transition_count·min_transition_count 와 같은
+        규약이다.
+        """
+        counts = [
+            report.transition_count for report in self._reports
+        ]
+        if not counts:
+            return None
+        return sum(counts) / len(counts)
 
     @property
     def max_cabin_temp_c(self) -> float | None:
