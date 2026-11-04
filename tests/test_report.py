@@ -1503,5 +1503,73 @@ class CareReportLogMinExceptionCountTest(unittest.TestCase):
         self.assertEqual(log.max_exception_count, 1)
 
 
+class CareReportLogAverageExceptionCountTest(unittest.TestCase):
+    def test_empty_log_average_exception_count_is_none(self):
+        log = CareReportLog()
+
+        self.assertIsNone(log.average_exception_count)
+
+    def test_average_exception_count_is_mean_of_counts(self):
+        log = CareReportLog()
+        log.add_report(make_report(exception_count=0))
+        log.add_report(make_report(exception_count=2))
+        log.add_report(make_report(exception_count=1))
+
+        self.assertEqual(log.average_exception_count, 1.0)
+        self.assertEqual(
+            log.average_exception_count,
+            log.total_exception_count / len(log),
+        )
+
+    def test_average_exception_count_is_zero_when_no_exceptions(self):
+        log = CareReportLog()
+        log.add_report(make_report(exception_count=0))
+        log.add_report(make_report(exception_count=0))
+
+        self.assertEqual(log.average_exception_count, 0.0)
+        self.assertIsNotNone(log.average_exception_count)
+
+    def test_single_report_average_exception_count_is_its_count(self):
+        log = CareReportLog()
+        log.add_report(make_report(exception_count=3))
+
+        self.assertEqual(log.average_exception_count, 3.0)
+
+    def test_duplicate_report_average_stays_and_lookup_does_not_mutate(self):
+        report = make_report(exception_count=2)
+        log = CareReportLog()
+        log.add_report(report)
+        log.add_report(report)
+        reports_before = log.reports
+
+        self.assertEqual(log.average_exception_count, 2.0)
+        self.assertEqual(log.average_exception_count, 2.0)
+        self.assertEqual(log.reports, reports_before)
+        self.assertEqual(len(log), 2)
+
+    def test_average_exception_count_from_fixed_scenarios(self):
+        from engine.adapters.simulator import replay_scenario
+
+        sessions = []
+        for name in (
+            "dropoff_normal",
+            "forgotten_rising_temp",
+            "pet_dropoff",
+        ):
+            session = CareSession()
+            replay_scenario(session, name)
+            sessions.append(session)
+        log = CareReportLog()
+        returned = log.add_sessions(sessions)
+
+        self.assertEqual(returned[0].exception_count, 0)
+        self.assertEqual(returned[1].exception_count, 1)
+        self.assertEqual(returned[2].exception_count, 0)
+        self.assertAlmostEqual(log.average_exception_count, 1 / 3)
+        self.assertEqual(log.total_exception_count, 1)
+        self.assertEqual(log.max_exception_count, 1)
+        self.assertEqual(log.min_exception_count, 0)
+
+
 if __name__ == "__main__":
     unittest.main()
