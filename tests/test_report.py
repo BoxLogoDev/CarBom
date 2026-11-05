@@ -1764,5 +1764,141 @@ class CareReportLogAverageTransitionCountTest(unittest.TestCase):
         self.assertEqual(log.min_transition_count, 5)
 
 
+class CareReportLogPassengerFilterTest(unittest.TestCase):
+    def test_empty_log_passenger_filters_are_empty_tuples(self):
+        log = CareReportLog()
+
+        self.assertEqual(log.reports_with_passenger, ())
+        self.assertEqual(log.reports_without_passenger, ())
+        self.assertIsInstance(log.reports_with_passenger, tuple)
+        self.assertIsInstance(log.reports_without_passenger, tuple)
+
+    def test_passenger_present_only_reports_are_all_in_with_filter(self):
+        first = make_report(
+            final_state=SessionState.EXCEPTION,
+            completed=False,
+            exception_count=1,
+            passenger_present=True,
+        )
+        second = make_report(
+            final_state=SessionState.EXCEPTION,
+            completed=False,
+            exception_count=2,
+            passenger_present=True,
+        )
+        log = CareReportLog()
+        log.add_report(first)
+        log.add_report(second)
+
+        self.assertEqual(log.reports_with_passenger, (first, second))
+        self.assertTrue(
+            all(
+                report.passenger_present
+                for report in log.reports_with_passenger
+            )
+        )
+        self.assertEqual(log.reports_without_passenger, ())
+
+    def test_passenger_absent_only_reports_are_all_in_without_filter(self):
+        first = make_report()
+        second = make_report(completed=False)
+        log = CareReportLog()
+        log.add_report(first)
+        log.add_report(second)
+
+        self.assertEqual(log.reports_without_passenger, (first, second))
+        self.assertTrue(
+            all(
+                not report.passenger_present
+                for report in log.reports_without_passenger
+            )
+        )
+        self.assertEqual(log.reports_with_passenger, ())
+
+    def test_mixed_reports_partition_between_passenger_filters(self):
+        absent_completed = make_report()
+        present_exception = make_report(
+            final_state=SessionState.EXCEPTION,
+            completed=False,
+            exception_count=1,
+            passenger_present=True,
+        )
+        absent_in_progress = make_report(completed=False)
+        present_recovered = make_report(
+            exception_count=1, passenger_present=True
+        )
+        log = CareReportLog()
+        for report in (
+            absent_completed,
+            present_exception,
+            absent_in_progress,
+            present_recovered,
+        ):
+            log.add_report(report)
+
+        self.assertEqual(
+            log.reports_with_passenger,
+            (present_exception, present_recovered),
+        )
+        self.assertEqual(
+            log.reports_without_passenger,
+            (absent_completed, absent_in_progress),
+        )
+        self.assertEqual(
+            len(log.reports_with_passenger)
+            + len(log.reports_without_passenger),
+            len(log.reports),
+        )
+        self.assertEqual(
+            log.reports_with_passenger,
+            tuple(r for r in log.reports if r.passenger_present),
+        )
+        self.assertEqual(
+            log.reports_without_passenger,
+            tuple(r for r in log.reports if not r.passenger_present),
+        )
+
+    def test_duplicate_report_kept_twice_and_lookup_does_not_mutate(self):
+        report = make_report(
+            final_state=SessionState.EXCEPTION,
+            completed=False,
+            exception_count=1,
+            passenger_present=True,
+        )
+        log = CareReportLog()
+        log.add_report(report)
+        log.add_report(report)
+        reports_before = log.reports
+
+        self.assertEqual(log.reports_with_passenger, (report, report))
+        self.assertEqual(log.reports_with_passenger, (report, report))
+        self.assertEqual(log.reports_without_passenger, ())
+        self.assertEqual(log.reports, reports_before)
+        self.assertEqual(len(log), 2)
+
+    def test_passenger_filters_from_fixed_scenarios(self):
+        from engine.adapters.simulator import replay_scenario
+
+        sessions = []
+        for name in (
+            "dropoff_normal",
+            "forgotten_rising_temp",
+            "pet_dropoff",
+        ):
+            session = CareSession()
+            replay_scenario(session, name)
+            sessions.append(session)
+        log = CareReportLog()
+        returned = log.add_sessions(sessions)
+
+        self.assertEqual(log.reports_with_passenger, (returned[1],))
+        self.assertEqual(
+            log.reports_without_passenger, (returned[0], returned[2])
+        )
+        self.assertTrue(returned[1].passenger_present)
+        self.assertFalse(returned[0].passenger_present)
+        self.assertFalse(returned[2].passenger_present)
+
+
 if __name__ == "__main__":
     unittest.main()

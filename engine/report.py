@@ -17,6 +17,10 @@
 누적함의 예외 없는 조회는 exception_occurred 가 False 인 리포트만
 돌려주며, exception_reports 의 여집합이고 그 길이는
 sessions_without_exception 와 같다.
+누적함의 동승자 잔류 조회는 passenger_present 가 True 인 리포트만
+돌려주며, 누적함을 바꾸지 않는다.
+누적함의 동승자 없음 조회는 passenger_present 가 False 인 리포트만
+돌려주며, 동승자 잔류 조회의 여집합이다.
 누적함의 미완료 수는 완료되지 않은 리포트의 개수이며, 전체 개수에서
 완료 수를 뺀 값이자 미완료 필터 조회의 길이와 같다.
 누적함의 전체 전이 수는 누적된 모든 리포트의 transition_count
@@ -242,6 +246,34 @@ class CareReportLog:
             report
             for report in self._reports
             if not report.exception_occurred
+        )
+
+    @property
+    def reports_with_passenger(self) -> tuple[CareReport, ...]:
+        """동승자가 남아 있는 리포트만 누적 순서 그대로 담은 tuple.
+
+        passenger_present 가 True 인 리포트만 고른다.
+        reports_without_passenger 와 여집합 관계에 있으며(모든
+        리포트는 두 필터 중 정확히 한쪽에만 들어간다), 누적함은
+        바꾸지 않으며, 빈 누적함이면 빈 tuple 이다.
+        """
+        return tuple(
+            report for report in self._reports if report.passenger_present
+        )
+
+    @property
+    def reports_without_passenger(self) -> tuple[CareReport, ...]:
+        """동승자가 남아 있지 않은 리포트만 누적 순서 그대로 담은 tuple.
+
+        passenger_present 가 False 인 리포트만 고르며,
+        reports_with_passenger 의 여집합이다(모든 리포트는 두 필터 중
+        정확히 한쪽에만 들어간다). 누적함은 바꾸지 않으며, 빈
+        누적함이면 빈 tuple 이다.
+        """
+        return tuple(
+            report
+            for report in self._reports
+            if not report.passenger_present
         )
 
     @property
