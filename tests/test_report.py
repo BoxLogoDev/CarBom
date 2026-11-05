@@ -1900,5 +1900,107 @@ class CareReportLogPassengerFilterTest(unittest.TestCase):
         self.assertFalse(returned[2].passenger_present)
 
 
+class CareReportLogPassengerCountTest(unittest.TestCase):
+    def test_empty_log_passenger_counts_are_zero(self):
+        log = CareReportLog()
+
+        self.assertEqual(log.sessions_with_passenger, 0)
+        self.assertEqual(log.sessions_without_passenger, 0)
+        self.assertEqual(len(log), 0)
+
+    def test_passenger_present_only_reports_count_all_with(self):
+        log = CareReportLog()
+        log.add_report(
+            make_report(
+                final_state=SessionState.EXCEPTION,
+                completed=False,
+                exception_count=1,
+                passenger_present=True,
+            )
+        )
+        log.add_report(
+            make_report(
+                final_state=SessionState.EXCEPTION,
+                completed=False,
+                exception_count=2,
+                passenger_present=True,
+            )
+        )
+
+        self.assertEqual(log.sessions_with_passenger, 2)
+        self.assertEqual(log.sessions_without_passenger, 0)
+
+    def test_passenger_absent_only_reports_count_all_without(self):
+        log = CareReportLog()
+        log.add_report(make_report())
+        log.add_report(make_report(completed=False))
+
+        self.assertEqual(log.sessions_with_passenger, 0)
+        self.assertEqual(log.sessions_without_passenger, 2)
+
+    def test_mixed_reports_passenger_counts_partition_and_match_filters(self):
+        log = CareReportLog()
+        log.add_report(make_report())
+        log.add_report(
+            make_report(
+                final_state=SessionState.EXCEPTION,
+                completed=False,
+                exception_count=1,
+                passenger_present=True,
+            )
+        )
+        log.add_report(make_report(completed=False))
+        log.add_report(
+            make_report(exception_count=1, passenger_present=True)
+        )
+
+        self.assertEqual(len(log), 4)
+        self.assertEqual(log.sessions_with_passenger, 2)
+        self.assertEqual(log.sessions_without_passenger, 2)
+        self.assertEqual(
+            log.sessions_with_passenger + log.sessions_without_passenger,
+            len(log),
+        )
+        self.assertEqual(
+            log.sessions_with_passenger, len(log.reports_with_passenger)
+        )
+        self.assertEqual(
+            log.sessions_without_passenger,
+            len(log.reports_without_passenger),
+        )
+
+    def test_duplicate_passenger_report_counts_twice(self):
+        report = make_report(
+            final_state=SessionState.EXCEPTION,
+            completed=False,
+            exception_count=1,
+            passenger_present=True,
+        )
+        log = CareReportLog()
+        log.add_report(report)
+        log.add_report(report)
+
+        self.assertEqual(log.sessions_with_passenger, 2)
+        self.assertEqual(log.sessions_without_passenger, 0)
+
+    def test_passenger_counts_from_fixed_scenarios(self):
+        from engine.adapters.simulator import replay_scenario
+
+        sessions = []
+        for name in (
+            "dropoff_normal",
+            "forgotten_rising_temp",
+            "pet_dropoff",
+        ):
+            session = CareSession()
+            replay_scenario(session, name)
+            sessions.append(session)
+        log = CareReportLog()
+        log.add_sessions(sessions)
+
+        self.assertEqual(log.sessions_with_passenger, 1)
+        self.assertEqual(log.sessions_without_passenger, 2)
+
+
 if __name__ == "__main__":
     unittest.main()
