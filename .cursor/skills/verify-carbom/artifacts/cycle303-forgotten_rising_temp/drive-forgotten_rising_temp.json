@@ -1,0 +1,57 @@
+{
+  "scenario": "forgotten_rising_temp",
+  "final_state": "EXCEPTION",
+  "expected_final_state": "EXCEPTION",
+  "passenger_present": true,
+  "current_snapshot": {
+    "cabin_temp_c": 35.5,
+    "timestamp": 420.0
+  },
+  "transitions": [
+    {
+      "from_state": "IDLE",
+      "to_state": "BOARDING",
+      "reason": "rear_door_opened",
+      "timestamp": 0.0
+    },
+    {
+      "from_state": "BOARDING",
+      "to_state": "ONBOARD",
+      "reason": "passenger_onboard",
+      "timestamp": 60.0
+    },
+    {
+      "from_state": "ONBOARD",
+      "to_state": "DRIVING",
+      "reason": "ignition_on",
+      "timestamp": 120.0
+    },
+    {
+      "from_state": "DRIVING",
+      "to_state": "ARRIVED",
+      "reason": "ignition_off",
+      "timestamp": 180.0
+    },
+    {
+      "from_state": "ARRIVED",
+      "to_state": "EXCEPTION",
+      "reason": "ignition_off_locked_passenger_present",
+      "timestamp": 240.0
+    }
+  ],
+  "guidance": {
+    "level": "URGENT",
+    "text": "위험합니다. 잠긴 차량의 뒷좌석에 동승자가 남아 있을 수 있고 실내 온도 35.5도입니다. 즉시 뒷좌석을 확인해 주세요.",
+    "reason": "passenger_left_locked_dangerous_cabin_temp"
+  },
+  "report": {
+    "final_state": "EXCEPTION",
+    "completed": false,
+    "exception_occurred": true,
+    "exception_count": 1,
+    "transition_count": 5,
+    "max_cabin_temp_c": 35.5,
+    "duration_seconds": 240.0,
+    "summary": "예외 발생 · 하차 미확인"
+  }
+}
