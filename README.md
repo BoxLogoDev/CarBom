@@ -150,6 +150,7 @@ carbom/
     test_exception_hvac_qa.py
     test_exception_belt_qa.py
     test_idle_simultaneous_input_qa.py
+- tests/test_boarding_simultaneous_input_qa.py
 ```
 
 ## 예정 (아직 구현되지 않음)
