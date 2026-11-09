@@ -28,7 +28,7 @@
 
 ## 테스트 (`tests/`)
 
-고정 시나리오 3종을 포함해 단위 테스트 1039개가 있습니다.
+고정 시나리오 3종을 포함해 단위 테스트 1045개가 있습니다.
 
 - 등원(아침) 정상 흐름 — 승차부터 하차 완료까지
 - 하차 깜빡 + 실내 온도 상승 예외 흐름 — 잠금 후 예외 진입, 온도 상승 중 예외 유지, 뒷문 열림으로 회복
@@ -162,6 +162,7 @@ carbom/
     test_event_snapshot_precedence_qa.py
     test_interleaved_sessions_qa.py
     test_history_snapshot_qa.py
+    test_alighting_belt_qa.py
 ```
 
 ## 예정 (아직 구현되지 않음)
