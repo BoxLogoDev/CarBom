@@ -1,0 +1,353 @@
+"""QA scenarios for ignition input alone while ARRIVED."""
+
+import unittest
+
+from engine import (
+    CareSession,
+    DestinationContext,
+    DoorState,
+    GuidanceLevel,
+    IgnitionState,
+    LockState,
+    SessionState,
+    SignalEvent,
+    SignalEventType,
+    SignalSnapshot,
+    guidance_for_session,
+    report_for_session,
+)
+from engine.adapters.simulator import dropoff_normal_snapshots
+
+
+def snapshot(**overrides):
+    values = {
+        "rear_door": DoorState.CLOSED,
+        "rear_seat_belt_buckled": False,
+        "ignition": IgnitionState.OFF,
+        "hvac_on": False,
+        "cabin_temp_c": None,
+        "lock": LockState.UNLOCKED,
+        "timestamp": None,
+    }
+    values.update(overrides)
+    return SignalSnapshot(**values)
+
+
+def arrived_session():
+    session = CareSession()
+    for item in dropoff_normal_snapshots()[:4]:
+        session.apply_snapshot(item)
+    return session
+
+
+def arrived_event_session():
+    session = CareSession()
+    session.apply_event(
+        SignalEvent(type=SignalEventType.REAR_DOOR_OPENED, timestamp=0.0)
+    )
+    session.apply_event(
+        SignalEvent(type=SignalEventType.REAR_BELT_BUCKLED, timestamp=10.0)
+    )
+    session.apply_event(
+        SignalEvent(type=SignalEventType.REAR_DOOR_CLOSED, timestamp=20.0)
+    )
+    session.apply_event(
+        SignalEvent(type=SignalEventType.IGNITION_ON, timestamp=30.0)
+    )
+    session.apply_event(
+        SignalEvent(type=SignalEventType.IGNITION_OFF, timestamp=40.0)
+    )
+    return session
+
+
+class ArrivedIgnitionQATest(unittest.TestCase):
+    def test_arrived_ignition_off_alone_stays_arrived(self):
+        session = arrived_session()
+
+        self.assertEqual(session.state, SessionState.ARRIVED)
+        self.assertEqual(len(session.history), 4)
+        self.assertTrue(session.passenger_present)
+        self.assertEqual(
+            [
+                (
+                    transition.from_state,
+                    transition.to_state,
+                    transition.reason,
+                    transition.timestamp,
+                )
+                for transition in session.history
+            ],
+            [
+                (
+                    SessionState.IDLE,
+                    SessionState.BOARDING,
+                    "rear_door_opened",
+                    0.0,
+                ),
+                (
+                    SessionState.BOARDING,
+                    SessionState.ONBOARD,
+                    "passenger_onboard",
+                    60.0,
+                ),
+                (
+                    SessionState.ONBOARD,
+                    SessionState.DRIVING,
+                    "ignition_on",
+                    120.0,
+                ),
+                (
+                    SessionState.DRIVING,
+                    SessionState.ARRIVED,
+                    "ignition_off",
+                    180.0,
+                ),
+            ],
+        )
+
+        for timestamp in (210.0, 220.0):
+            session.apply_snapshot(
+                snapshot(
+                    rear_seat_belt_buckled=True,
+                    ignition=IgnitionState.OFF,
+                    cabin_temp_c=24.0,
+                    timestamp=timestamp,
+                )
+            )
+            self.assertEqual(session.state, SessionState.ARRIVED)
+            self.assertEqual(len(session.history), 4)
+
+        self.assertTrue(session.passenger_present)
+        self.assertFalse(session.current_snapshot.ignition_on)
+        self.assertEqual(session.current_snapshot.timestamp, 220.0)
+
+        guidance = guidance_for_session(
+            session, context=DestinationContext.DROPOFF
+        )
+        self.assertEqual(guidance.level, GuidanceLevel.REMIND)
+        self.assertEqual(
+            guidance.reason, "arrived_dropoff_check_rear_seat"
+        )
+        self.assertEqual(
+            guidance.text,
+            "도착했습니다. 등원 하차 전 뒷좌석을 확인해 주세요.",
+        )
+
+        report = report_for_session(session)
+        self.assertEqual(report.final_state, SessionState.ARRIVED)
+        self.assertFalse(report.completed)
+        self.assertEqual(report.exception_count, 0)
+        self.assertEqual(report.transition_count, 4)
+        self.assertEqual(report.duration_seconds, 180.0)
+        self.assertEqual(report.max_cabin_temp_c, 24.0)
+        self.assertEqual(report.summary, "진행 중 · 하차 미확인")
+
+        event_session = arrived_event_session()
+        self.assertEqual(event_session.state, SessionState.ARRIVED)
+        self.assertEqual(len(event_session.history), 4)
+
+        event_session.apply_event(
+            SignalEvent(type=SignalEventType.IGNITION_OFF, timestamp=50.0)
+        )
+        self.assertEqual(event_session.state, SessionState.ARRIVED)
+        self.assertEqual(len(event_session.history), 4)
+
+    def test_arrived_ignition_on_alone_stays_arrived_no_redrive(self):
+        session = arrived_session()
+
+        for timestamp in (210.0, 220.0):
+            session.apply_snapshot(
+                snapshot(
+                    rear_seat_belt_buckled=True,
+                    ignition=IgnitionState.ON,
+                    cabin_temp_c=24.0,
+                    timestamp=timestamp,
+                )
+            )
+            self.assertEqual(session.state, SessionState.ARRIVED)
+            self.assertNotEqual(session.state, SessionState.DRIVING)
+            self.assertEqual(len(session.history), 4)
+
+        self.assertTrue(session.passenger_present)
+        self.assertTrue(session.current_snapshot.ignition_on)
+
+        guidance = guidance_for_session(
+            session, context=DestinationContext.DROPOFF
+        )
+        self.assertEqual(guidance.level, GuidanceLevel.REMIND)
+        self.assertNotEqual(guidance.level, GuidanceLevel.INFO)
+        self.assertEqual(
+            guidance.reason, "arrived_dropoff_check_rear_seat"
+        )
+        self.assertNotEqual(guidance.reason, "driving")
+        self.assertEqual(
+            guidance.text,
+            "도착했습니다. 등원 하차 전 뒷좌석을 확인해 주세요.",
+        )
+
+        report = report_for_session(session)
+        self.assertEqual(report.exception_count, 0)
+        self.assertEqual(report.transition_count, 4)
+        self.assertEqual(report.duration_seconds, 180.0)
+        self.assertEqual(report.max_cabin_temp_c, 24.0)
+
+        event_session = arrived_event_session()
+        self.assertEqual(event_session.state, SessionState.ARRIVED)
+        self.assertEqual(len(event_session.history), 4)
+
+        event_session.apply_event(
+            SignalEvent(type=SignalEventType.IGNITION_ON, timestamp=50.0)
+        )
+        self.assertEqual(event_session.state, SessionState.ARRIVED)
+        self.assertEqual(len(event_session.history), 4)
+        self.assertTrue(event_session.current_snapshot.ignition_on)
+
+    def test_arrived_ignition_off_locked_goes_exception(self):
+        session = arrived_session()
+
+        session.apply_snapshot(
+            snapshot(
+                rear_seat_belt_buckled=True,
+                ignition=IgnitionState.OFF,
+                lock=LockState.LOCKED,
+                cabin_temp_c=24.0,
+                timestamp=210.0,
+            )
+        )
+
+        self.assertEqual(session.state, SessionState.EXCEPTION)
+        self.assertEqual(len(session.history), 5)
+        self.assertTrue(session.passenger_present)
+        last = session.history[-1]
+        self.assertEqual(
+            (last.from_state, last.to_state, last.reason, last.timestamp),
+            (
+                SessionState.ARRIVED,
+                SessionState.EXCEPTION,
+                "ignition_off_locked_passenger_present",
+                210.0,
+            ),
+        )
+
+        guidance = guidance_for_session(
+            session, context=DestinationContext.DROPOFF
+        )
+        self.assertEqual(guidance.level, GuidanceLevel.URGENT)
+        self.assertEqual(guidance.reason, "passenger_left_locked")
+
+        report = report_for_session(session)
+        self.assertEqual(report.final_state, SessionState.EXCEPTION)
+        self.assertFalse(report.completed)
+        self.assertTrue(report.exception_occurred)
+        self.assertEqual(report.exception_count, 1)
+        self.assertEqual(report.transition_count, 5)
+        self.assertEqual(report.duration_seconds, 210.0)
+        self.assertEqual(report.max_cabin_temp_c, 24.0)
+        self.assertEqual(report.summary, "예외 발생 · 하차 미확인")
+
+    def test_arrived_ignition_on_locked_high_temp_stays_arrived_no_exception(
+        self,
+    ):
+        session = arrived_session()
+
+        session.apply_snapshot(
+            snapshot(
+                rear_seat_belt_buckled=True,
+                ignition=IgnitionState.ON,
+                lock=LockState.LOCKED,
+                cabin_temp_c=35.5,
+                timestamp=210.0,
+            )
+        )
+
+        self.assertEqual(session.state, SessionState.ARRIVED)
+        self.assertEqual(len(session.history), 4)
+        self.assertTrue(session.passenger_present)
+
+        guidance = guidance_for_session(
+            session, context=DestinationContext.DROPOFF
+        )
+        self.assertEqual(guidance.level, GuidanceLevel.REMIND)
+        self.assertNotEqual(guidance.level, GuidanceLevel.URGENT)
+        self.assertEqual(
+            guidance.reason,
+            "arrived_dropoff_check_rear_seat_dangerous_cabin_temp",
+        )
+        self.assertIn("35.5도", guidance.text)
+        self.assertIn("즉시", guidance.text)
+
+        report = report_for_session(session)
+        self.assertEqual(report.exception_count, 0)
+        self.assertEqual(report.max_cabin_temp_c, 35.5)
+
+    def test_arrived_ignition_episode_then_normal_dropoff_completes(self):
+        session = arrived_session()
+
+        session.apply_snapshot(
+            snapshot(
+                rear_seat_belt_buckled=True,
+                ignition=IgnitionState.ON,
+                cabin_temp_c=24.0,
+                timestamp=210.0,
+            )
+        )
+        self.assertEqual(session.state, SessionState.ARRIVED)
+        self.assertEqual(len(session.history), 4)
+
+        session.apply_snapshot(
+            snapshot(
+                rear_seat_belt_buckled=True,
+                ignition=IgnitionState.OFF,
+                cabin_temp_c=24.0,
+                timestamp=220.0,
+            )
+        )
+        self.assertEqual(session.state, SessionState.ARRIVED)
+        self.assertEqual(len(session.history), 4)
+
+        for item in dropoff_normal_snapshots()[4:]:
+            session.apply_snapshot(item)
+
+        self.assertEqual(session.state, SessionState.COMPLETED)
+        self.assertEqual(len(session.history), 6)
+        self.assertEqual(
+            [transition.reason for transition in session.history],
+            [
+                "rear_door_opened",
+                "passenger_onboard",
+                "ignition_on",
+                "ignition_off",
+                "alighting_started",
+                "alighting_confirmed",
+            ],
+        )
+
+        report = report_for_session(session)
+        self.assertTrue(report.completed)
+        self.assertEqual(report.exception_count, 0)
+        self.assertEqual(report.transition_count, 6)
+        self.assertEqual(report.duration_seconds, 300.0)
+        self.assertEqual(report.summary, "하차 확인 완료 · 예외 없음")
+
+    def test_arrived_ignition_on_with_belt_unbuckled_keeps_passenger_latch(
+        self,
+    ):
+        session = arrived_session()
+
+        session.apply_snapshot(
+            snapshot(
+                rear_seat_belt_buckled=False,
+                ignition=IgnitionState.ON,
+                timestamp=210.0,
+            )
+        )
+
+        self.assertEqual(session.state, SessionState.ARRIVED)
+        self.assertEqual(len(session.history), 4)
+        self.assertTrue(session.passenger_present)
+        self.assertFalse(session.current_snapshot.rear_seat_belt_buckled)
+        self.assertTrue(session.current_snapshot.ignition_on)
+
+
+if __name__ == "__main__":
+    unittest.main()
