@@ -28,7 +28,7 @@
 
 ## 테스트 (`tests/`)
 
-고정 시나리오 3종을 포함해 단위 테스트 1135개가 있습니다.
+고정 시나리오 3종을 포함해 단위 테스트 1312개가 있습니다.
 
 - 등원(아침) 정상 흐름 — 승차부터 하차 완료까지
 - 하차 깜빡 + 실내 온도 상승 예외 흐름 — 잠금 후 예외 진입, 온도 상승 중 예외 유지, 뒷문 열림으로 회복
@@ -178,6 +178,35 @@ carbom/
     test_completed_lock_qa.py
     test_completed_belt_qa.py
     test_exception_ignition_qa.py
+    test_completed_ignition_qa.py
+    test_idle_temp_qa.py
+    test_boarding_temp_qa.py
+    test_onboard_temp_qa.py
+    test_driving_temp_qa.py
+    test_arrived_temp_qa.py
+    test_alighting_temp_qa.py
+    test_exception_temp_qa.py
+    test_completed_temp_qa.py
+    test_pet_event_path_qa.py
+    test_mixed_event_snapshot_path_qa.py
+    test_replay_snapshot_bulk_integration_qa.py
+    test_elder_event_path_qa.py
+    test_pickup_event_path_qa.py
+    test_adult_event_path_qa.py
+    test_pet_pickup_event_path_qa.py
+    test_child_pickup_event_path_qa.py
+    test_elder_pickup_event_path_qa.py
+    test_adult_pickup_event_path_qa.py
+    test_cabin_temp_clear_qa.py
+    test_event_temp_payload_qa.py
+    test_duplicate_event_delivery_qa.py
+    test_duplicate_snapshot_delivery_qa.py
+    test_dropped_snapshot_delivery_qa.py
+    test_dropped_event_delivery_qa.py
+    test_reordered_snapshot_delivery_qa.py
+    test_reordered_event_delivery_qa.py
+    test_truncated_snapshot_delivery_qa.py
+    test_truncated_event_delivery_qa.py
 ```
 
 ## 예정 (아직 구현되지 않음)
